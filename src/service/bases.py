@@ -2,15 +2,37 @@ import datetime
 from typing import Dict, List
 
 from pydantic import BaseModel, Field
+from pydantic_sqlalchemy import sqlalchemy_to_pydantic
+
+from src.service.models import Annotator, Annotation, Sample, Dataset
+
+BaseAnnotatorModel = sqlalchemy_to_pydantic(Annotator)
+BaseAnnotationModel = sqlalchemy_to_pydantic(Annotation)
+BaseSampleModel = sqlalchemy_to_pydantic(Sample)
+BaseDatasetModel = sqlalchemy_to_pydantic(Dataset)
 
 
-class SampleModel(BaseModel):
-    """Sample model."""
+class AnnotatorModel(BaseAnnotatorModel):
+    """The annotation model."""
 
-    id: int = Field(..., description="The sample id.")
-    filename: str = Field(..., description="The sample filename.")
-    s3url: str = Field(..., description="The sample s3 url.")
-    original_text: str = Field(..., description="The sample original text.")
-    asr_text: str = Field(..., description="The sample asr text.")
-    duration: float = Field(..., description="The sample duration.")
-    sentence_type: str = Field(..., description="The sample sentence type.")
+    annotation: List[BaseAnnotationModel] = Field(..., alias="annotations")
+
+
+class AnnotationModel(BaseAnnotationModel):
+    """The annotation model."""
+
+    annotator: BaseAnnotatorModel = Field(..., alias="annotator")
+    sample: BaseSampleModel = Field(..., alias="sample")
+
+
+class SampleModel(BaseSampleModel):
+    """The sample model."""
+
+    annotation: List[BaseAnnotationModel] = Field(..., alias="annotations")
+    dataset: BaseDatasetModel = Field(..., alias="dataset")
+
+
+class DatasetModel(BaseDatasetModel):
+    """The dataset model."""
+
+    samples: List[BaseSampleModel] = Field(..., alias="samples")

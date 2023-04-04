@@ -1,5 +1,6 @@
 import os
 import pdb
+import tempfile
 from typing import List, Tuple, Union
 
 import numpy as np
@@ -11,7 +12,7 @@ from sqlalchemy.sql import case, delete, select, update
 
 from src.logger import root_logger
 from src.paths import paths
-from src.service.models import Annotator, Annotation, Sample
+from src.service.models import Annotator, Annotation, Sample, Dataset
 from dotenv import load_dotenv
 
 
@@ -21,20 +22,46 @@ load_dotenv(os.path.join(BASE_DIR, "vars.env"))
 
 app_logger = root_logger.getChild("db_utils")
 
-# DBSession = scoped_session(sessionmaker())
-# engine = None
+
+def create_dataset(dataset_name: str) -> Dataset:
+    """Create a dataset in the database.
+
+    Args:
+        dataset_name (str): The name of the dataset.
+
+    Returns:
+        Dataset: The dataset created.
+    """
+    app_logger.debug(f"POSTGRES: Creating dataset {dataset_name}")
+    with db.session.begin():
+        dataset = Dataset(name=dataset_name)
+        db.session.add(dataset)
+        return dataset
 
 
-# def init_session(postgres_url):
-#     global engine, DBSession
-#     app_logger.debug(f"POSTGRES: Initializing session")
-#     engine = create_engine(postgres_url, echo=False, pool_size=20, max_overflow=0)
-#     DBSession.remove()
-#     DBSession.configure(bind=engine, autoflush=False, expire_on_commit=False)
+
+def list_datasets() -> List[Dataset]:
+    """List all the datasets in the database.
+
+    Returns:
+        List[Dataset]: The list of datasets.
+    """
+    app_logger.debug("POSTGRES: Listing datasets")
+    with db.session.begin():
+        return db.session.query(Dataset).all()
 
 
-# app_logger.debug(os.getenv("POSTGRES_URL"))
-# init_session(postgres_url=os.getenv("POSTGRES_URL"))
+def delete_dataset(dataset_id: int) -> None:
+    """Delete a dataset from the database.
+
+    Args:
+        dataset_id (int): The dataset id to delete.
+    """
+    app_logger.debug(f"POSTGRES: Deleting dataset {dataset_id}")
+    with db.session.begin():
+        db.session.query(Dataset).filter(Dataset.id == dataset_id).delete()
+
+
 
 
 def update_sample(sample_id: int, **kwargs) -> None:
@@ -50,15 +77,32 @@ def update_sample(sample_id: int, **kwargs) -> None:
 
 
 # Insert samples
-def insert_sample(sample: Sample) -> None:
+def insert_sample(dataset_id, sample: Sample) -> None:
     """Insert a sample into the database.
 
     Args:
+        dataset_id (int): The dataset id to insert the sample into.
         sample (Sample): The sample to insert.
     """
-    app_logger.debug(f"POSTGRES: Inserting sample {sample.id}")
+    app_logger.debug(f"POSTGRES: Inserting sample {sample.name}")
     with db.session.begin():
+        sample.dataset_id = dataset_id
         db.session.add(sample)
+
+
+def insert_samples(dataset_id: int, samples: List[Sample]) -> None:
+    """Insert a list of samples into the database.
+
+    Args:
+        dataset_id (int): The dataset id to insert the samples into.
+        samples (List[Sample]): The samples to insert.
+    """
+    app_logger.debug(f"POSTGRES: Inserting {len(samples)} samples")
+    with db.session.begin():
+        for sample in samples:
+            insert_samples(dataset_id, sample)
+
+
 
 
 def delete_sample(sample_id: int) -> None:
@@ -71,41 +115,15 @@ def delete_sample(sample_id: int) -> None:
     with db.session.begin():
         db.session.query(Sample).filter(Sample.id == sample_id).delete()
 
-
-def list_samples() -> List[Sample]:
-    """List all samples in the database.
-
-    Returns:
-        List[Sample]: A list of samples.
-    """
-    app_logger.debug(f"POSTGRES: Listing samples")
-    with db.session.begin():
-        return db.session.query(Sample).all()
-
-
-def get_sample(sample_id: int) -> Sample:
-    """Get a sample from the database.
+def list_samples(dataset_id: int) -> List[Sample]:
+    """List all the samples in the database.
 
     Args:
-        sample_id (int): The sample id to get.
+        dataset_id (int): The dataset id to list the samples from.
 
     Returns:
-        Sample: The sample.
+        List[Sample]: The list of samples.
     """
-    app_logger.debug(f"POSTGRES: Getting sample {sample_id}")
+    app_logger.debug(f"POSTGRES: Listing samples for dataset {dataset_id}")
     with db.session.begin():
-        return db.session.query(Sample).filter(Sample.id == sample_id).first()
-
-
-def get_sample_by_name(sample_name: str) -> Sample:
-    """Get a sample from the database.
-
-    Args:
-        sample_name (str): The sample name to get.
-
-    Returns:
-        Sample: The sample.
-    """
-    app_logger.debug(f"POSTGRES: Getting sample {sample_name}")
-    with db.session.begin():
-        return db.session.query(Sample).filter(Sample.name == sample_name).first()
+        return db.session.query(Sample).filter(Sample.dataset_id == dataset_id).all()

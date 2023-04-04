@@ -1,19 +1,25 @@
 from sqlalchemy import Column, DateTime, ForeignKey, func, Integer, MetaData, String, Enum, Boolean, Float
+from sqlalchemy import ARRAY, BigInteger, Column, Integer, String, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 
+# pretty print
+from pprint import pprint
 
 Base = declarative_base(metadata=MetaData())  # noqa: N801
 
 # Define a Annotator model in qhich we will store the annotators's username and email address
 class Annotator(Base):
     __tablename__ = "annotator"
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(120), unique=True, nullable=False)
+    annotation = relationship("Annotation", backref="annotator", cascade="all, delete, delete-orphan")
+    # add unique constraint to username and email
+    __table_args__ = (UniqueConstraint("username", "email", name="_username_email_uc"),)
 
     def __repr__(self):
-        return f"Annotator('{self.username}', '{self.email}')"
+        return pprint(self.to_dict())
 
     def to_dict(self):
         return {"id": self.id, "username": self.username, "email": self.email}
@@ -23,7 +29,8 @@ class Annotator(Base):
 # id, unique filename, s3url, original text, asr text, the duration of the recording, sentence_tyoe,
 class Sample(Base):
     __tablename__ = "sample"
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
+    dataset_id = Column(Integer, ForeignKey("dataset.id"), nullable=False)
     filename = Column(String(50), unique=True, nullable=False)
     s3url = Column(String(120), unique=True, nullable=False)
     original_text = Column(String(120), unique=False, nullable=False)
@@ -31,12 +38,18 @@ class Sample(Base):
     duration = Column(Float, unique=False, nullable=False)
     sentence_type = Column(String(50), unique=False, nullable=False)
 
+    annotation = relationship("Annotation", backref="sample", cascade="all, delete, delete-orphan")
+    dataset = relationship("Dataset", backref="samples", cascade="all, delete, delete-orphan")
+
+    __table_args__ = (UniqueConstraint("filename", "s3url", name="_filename_s3url_uc"),)
+
     def __repr__(self):
-        return f"Sample '{self.filename}' with '{self.original_text}'"
+        return pprint(self.to_dict())
 
     def to_dict(self):
         return {
             "id": self.id,
+            "dataset_id": self.dataset_id,
             "filename": self.filename,
             "s3url": self.s3url,
             "original_text": self.original_text,
@@ -74,10 +87,12 @@ class Annotation(Base):
     feedback = Column(String(250), unique=False, nullable=True)
 
     annotator = relationship("Annotator", backref="annotations")
-    sample = relationship("Sample", backref="annotations")
+    sample = relationship("Sample", backref="annotation")
+
+    __table_args__ = (UniqueConstraint("annotator_id", "sample_id", name="_annotator_sample_uc"),)
 
     def __repr__(self):
-        return f"Annotation of '{self.annotator_id}' on '{self.sample_id}' at '{self.created_at}"
+        return pprint(self.to_dict())
 
     def to_dict(self):
         return {
@@ -94,4 +109,29 @@ class Annotation(Base):
             "isSpeedRight": self.isSpeedRight,
             "isConsisent": self.isConsisent,
             "feedback": self.feedback,
+        }
+
+
+# Define a Dataset model in which we will store the following information for a dataset:
+# id, name, description, the date and time when the dataset was created, list of sampes in the dataset
+class Dataset(Base):
+    __tablename__ = "dataset"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False)
+    description = Column(String(250), unique=False, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    samples = relationship("Sample", backref="dataset", cascade="all, delete, delete-orphan")
+
+    __table_args__ = (UniqueConstraint("name", name="_name_uc"),)
+
+    def __repr__(self):
+        return pprint(self.to_dict())
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "created_at": self.created_at,
+            "samples": [sample.to_dict() for sample in self.samples],
         }
