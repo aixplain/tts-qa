@@ -1,19 +1,12 @@
 import os
-import pdb
-import tempfile
-from typing import List, Tuple, Union
+from typing import List
 
-import numpy as np
+from dotenv import load_dotenv
 from fastapi_sqlalchemy import db
-from sqlalchemy import Column, MetaData, Table, Text, create_engine
-from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.schema import DropTable
-from sqlalchemy.sql import case, delete, select, update
 
 from src.logger import root_logger
 from src.paths import paths
-from src.service.models import Annotator, Annotation, Sample, Dataset
-from dotenv import load_dotenv
+from src.service.models import Annotation, Annotator, Dataset, Sample  # # noqa: F401
 
 
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
@@ -23,7 +16,7 @@ load_dotenv(os.path.join(BASE_DIR, "vars.env"))
 app_logger = root_logger.getChild("db_utils")
 
 
-def create_dataset(dataset_name: str) -> Dataset:
+def create_dataset(dataset_name: str, description: str) -> Dataset:
     """Create a dataset in the database.
 
     Args:
@@ -34,10 +27,14 @@ def create_dataset(dataset_name: str) -> Dataset:
     """
     app_logger.debug(f"POSTGRES: Creating dataset {dataset_name}")
     with db.session.begin():
-        dataset = Dataset(name=dataset_name)
+        # check if the dataset already exists
+        dataset = db.session.query(Dataset).filter(Dataset.name == dataset_name).first()
+        if dataset:
+            raise ValueError(f"Dataset {dataset_name} already exists")
+
+        dataset = Dataset(name=dataset_name, description=description)
         db.session.add(dataset)
         return dataset
-
 
 
 def list_datasets() -> List[Dataset]:
@@ -59,9 +56,31 @@ def delete_dataset(dataset_id: int) -> None:
     """
     app_logger.debug(f"POSTGRES: Deleting dataset {dataset_id}")
     with db.session.begin():
+        # check if the dataset exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
         db.session.query(Dataset).filter(Dataset.id == dataset_id).delete()
 
 
+def get_dataset_by_id(dataset_id: int) -> Dataset:
+    """Get a dataset by id.
+
+    Args:
+        dataset_id (int): The dataset id to get.
+
+    Returns:
+        Dataset: The dataset.
+    """
+    app_logger.debug(f"POSTGRES: Getting dataset {dataset_id}")
+    with db.session.begin():
+        # check if the dataset exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
+        return db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
 
 
 def update_sample(sample_id: int, **kwargs) -> None:
@@ -73,6 +92,11 @@ def update_sample(sample_id: int, **kwargs) -> None:
     """
     app_logger.debug(f"POSTGRES: Updating sample {sample_id}")
     with db.session.begin():
+        # check if the sample exists
+        sample = db.session.query(Sample).filter(Sample.id == sample_id).first()
+        if not sample:
+            raise ValueError(f"Sample {sample_id} does not exist")
+
         db.session.query(Sample).filter(Sample.id == sample_id).update(kwargs)
 
 
@@ -86,6 +110,11 @@ def insert_sample(dataset_id, sample: Sample) -> None:
     """
     app_logger.debug(f"POSTGRES: Inserting sample {sample.name}")
     with db.session.begin():
+        # check if the dataset already exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
         sample.dataset_id = dataset_id
         db.session.add(sample)
 
@@ -99,10 +128,13 @@ def insert_samples(dataset_id: int, samples: List[Sample]) -> None:
     """
     app_logger.debug(f"POSTGRES: Inserting {len(samples)} samples")
     with db.session.begin():
+        # check if the dataset already exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
         for sample in samples:
             insert_samples(dataset_id, sample)
-
-
 
 
 def delete_sample(sample_id: int) -> None:
@@ -113,7 +145,13 @@ def delete_sample(sample_id: int) -> None:
     """
     app_logger.debug(f"POSTGRES: Deleting sample {sample_id}")
     with db.session.begin():
+        # check if the sample exists
+        sample = db.session.query(Sample).filter(Sample.id == sample_id).first()
+        if not sample:
+            raise ValueError(f"Sample {sample_id} does not exist")
+
         db.session.query(Sample).filter(Sample.id == sample_id).delete()
+
 
 def list_samples(dataset_id: int) -> List[Sample]:
     """List all the samples in the database.
@@ -126,4 +164,9 @@ def list_samples(dataset_id: int) -> List[Sample]:
     """
     app_logger.debug(f"POSTGRES: Listing samples for dataset {dataset_id}")
     with db.session.begin():
+        # check if the dataset already exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
         return db.session.query(Sample).filter(Sample.dataset_id == dataset_id).all()

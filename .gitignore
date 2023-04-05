@@ -18,8 +18,10 @@
 **/*.pth
 **/exec_spec*
 backend/xview2/
-# ignore weights 
+# ignore weights
 **/weights/
+
+alembic/versions/
 # ignore only root data
 /data
 **/manifest_vad_input.json

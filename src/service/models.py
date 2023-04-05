@@ -1,20 +1,21 @@
-from sqlalchemy import Column, DateTime, ForeignKey, func, Integer, MetaData, String, Enum, Boolean, Float
-from sqlalchemy import ARRAY, BigInteger, Column, Integer, String, UniqueConstraint
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, Mapped
-
 # pretty print
 from pprint import pprint
 
-Base = declarative_base(metadata=MetaData())  # noqa: N801
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, func, Integer, MetaData, String, UniqueConstraint
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+
+
+Base = declarative_base(metadata=MetaData())
 
 # Define a Annotator model in qhich we will store the annotators's username and email address
-class Annotator(Base):
+class Annotator(Base):  # type: ignore
     __tablename__ = "annotator"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(120), unique=True, nullable=False)
-    annotation = relationship("Annotation", backref="annotator", cascade="all, delete, delete-orphan")
+    annotations = relationship("Annotation", backref="annotator")
+
     # add unique constraint to username and email
     __table_args__ = (UniqueConstraint("username", "email", name="_username_email_uc"),)
 
@@ -27,7 +28,7 @@ class Annotator(Base):
 
 # Define a Sample model in which we will store following nformation for an tts recording sample:
 # id, unique filename, s3url, original text, asr text, the duration of the recording, sentence_tyoe,
-class Sample(Base):
+class Sample(Base):  # type: ignore
     __tablename__ = "sample"
     id = Column(Integer, primary_key=True, index=True)
     dataset_id = Column(Integer, ForeignKey("dataset.id"), nullable=False)
@@ -37,9 +38,6 @@ class Sample(Base):
     asr_text = Column(String(120), unique=False, nullable=True)
     duration = Column(Float, unique=False, nullable=False)
     sentence_type = Column(String(50), unique=False, nullable=False)
-
-    annotation = relationship("Annotation", backref="sample", cascade="all, delete, delete-orphan")
-    dataset = relationship("Dataset", backref="samples", cascade="all, delete, delete-orphan")
 
     __table_args__ = (UniqueConstraint("filename", "s3url", name="_filename_s3url_uc"),)
 
@@ -70,7 +68,7 @@ class Sample(Base):
 # isSpeedRight bool default is NULL, True, False
 # isConsisent bool default is NULL, True, False
 # feedback text
-class Annotation(Base):
+class Annotation(Base):  # type: ignore
     __tablename__ = "annotation"
     id = Column(Integer, primary_key=True)
     annotator_id = Column(Integer, ForeignKey("annotator.id"), nullable=False)
@@ -85,9 +83,6 @@ class Annotation(Base):
     isSpeedRight = Column(Boolean, default=None, nullable=True)
     isConsisent = Column(Boolean, default=None, nullable=True)
     feedback = Column(String(250), unique=False, nullable=True)
-
-    annotator = relationship("Annotator", backref="annotations")
-    sample = relationship("Sample", backref="annotation")
 
     __table_args__ = (UniqueConstraint("annotator_id", "sample_id", name="_annotator_sample_uc"),)
 
@@ -114,7 +109,7 @@ class Annotation(Base):
 
 # Define a Dataset model in which we will store the following information for a dataset:
 # id, name, description, the date and time when the dataset was created, list of sampes in the dataset
-class Dataset(Base):
+class Dataset(Base):  # type: ignore
     __tablename__ = "dataset"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), unique=True, nullable=False)
