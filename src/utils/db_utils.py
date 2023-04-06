@@ -1,4 +1,6 @@
 import os
+import shutil
+import tempfile
 from typing import List
 
 import boto3
@@ -10,7 +12,7 @@ from tqdm import tqdm
 from src.logger import root_logger
 from src.paths import paths
 from src.service.models import Annotation, Annotator, Dataset, Sample  # # noqa: F401
-from src.utils.audio import evaluate_audio
+from src.utils.audio import convert_to_88k, convert_to_mono, evaluate_audio, normalize_audio, trim_audio  # noqa: F401
 
 
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
@@ -75,7 +77,8 @@ def delete_dataset(id: int) -> None:
         if not dataset:
             raise ValueError(f"Dataset {id} does not exist")
 
-        db.session.query(Dataset).filter(Dataset.id == id).delete()
+        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+        db.session.delete(dataset)
         db.session.commit()
 
 
@@ -247,6 +250,8 @@ def insert_sample(
     dataset_id: int,
     wav_path: str,
     text: str,
+    s3_bucket: str = None,
+    s3_key: str = None,
 ) -> Sample:
     """Insert a sample in the database.
 
@@ -273,10 +278,27 @@ def insert_sample(
 
         # get the meta data
         meta = evaluate_audio(wav_path)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.basename(wav_path)
+            postprocess_path = os.path.join(tmpdir, filename)
+            # copy the file to the temp directory
+            shutil.copy(wav_path, postprocess_path)
+            if meta["is_88khz"] == False:
+                convert_to_88k(postprocess_path, postprocess_path)
+
+            if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
+                normalize_audio(postprocess_path, postprocess_path)
+
+            if int(meta["n_channel"]) != 1:
+                convert_to_mono(postprocess_path, postprocess_path)
+
+            meta = evaluate_audio(postprocess_path)
+
         sample = Sample(
             dataset_id=dataset_id,
             filename=wav_path,
-            s3url=None,
+            s3url=f"s3://{s3_bucket}/{s3_key}",
             original_text=text,
             asr_text=None,
             duration=meta["duration"],
@@ -292,6 +314,7 @@ def insert_sample(
             peak_volume_db=meta["peak_volume_db"],
             size=meta["size"],
             isValid=meta["isValid"],
+            wer=None,
         )
         db.session.add(sample)
         db.session.commit()
@@ -314,7 +337,7 @@ def delete_sample(id: int) -> None:
         db.session.commit()
 
 
-def list_samples(dataset_id: int) -> List[Sample]:
+def list_samples(dataset_id: int, top_k: int = None) -> List[Sample]:
     """List all the samples in the database.
 
     Args:
@@ -329,14 +352,15 @@ def list_samples(dataset_id: int) -> List[Sample]:
         dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
         if not dataset:
             raise ValueError(f"Dataset {dataset_id} does not exist")
-
-        samples = db.session.query(Sample).filter(Sample.id == dataset_id).all()
-        db.session.commit()
+        if top_k:
+            samples = db.session.query(Sample).filter(Sample.dataset_id == dataset_id).limit(top_k).all()
+        else:
+            samples = db.session.query(Sample).filter(Sample.dataset_id == dataset_id).all()
 
     return samples
 
 
-def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
+async def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
 
     # get dataset
     dataset = get_dataset_by_id(dataset_id)
@@ -346,47 +370,64 @@ def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
 
     # Simulate a long-running process
     df = pd.read_csv(csv_path)
+
     df["s3path"] = df["file_name"].apply(lambda x: os.path.join(dataset_dir, dataset_name, x))
 
     s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"))
 
-    for _, row in df.iterrows():
-        # check if not there
-        # if not s3.head_object(Bucket=bucket_name, Key=row["s3path"])["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        s3.upload_file(row["local_path"], bucket_name, row["s3path"])
+    # Check if the dataset already exists
+    dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not dataset:
+        raise ValueError(f"Dataset {dataset_id} does not exist")
+    failed = []
+    # get_metadata of each sample using evaluate_audio method that return dict
+    for i, row in tqdm(df.iterrows(), total=len(df)):
+        try:
+            # make sure that db is closed
+            db.session.close()
+            with db.session.begin():
+                meta = evaluate_audio(row["local_path"])
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    filename = os.path.basename(row["local_path"])
+                    postprocess_path = os.path.join(tmpdir, filename)
+                    # copy the file to the temp directory
+                    shutil.copy(row["local_path"], postprocess_path)
+                    if meta["is_88khz"] == False:
+                        convert_to_88k(row["local_path"], row["local_path"])
 
-    # make sure that db is closed
-    db.session.close()
-    with db.session.begin():
-        # Check if the dataset already exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {dataset_id} does not exist")
+                    if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
+                        normalize_audio(row["local_path"], row["local_path"])
 
-        # get_metadata of each sample using evaluate_audio method that return dict
-        for i, row in tqdm(df.iterrows(), total=len(df)):
-            meta = evaluate_audio(row["local_path"])
-            sample = Sample(
-                dataset_id=dataset_id,
-                filename=row["file_name"],
-                s3url=f"s3://{bucket_name}/{row['s3path']}",
-                original_text=row["text"],
-                asr_text=None,
-                duration=meta["duration"],
-                trim_start=None,
-                trim_end=None,
-                sentence_type=row["sentence_type"],
-                sentence_length=row["sentence_length"],
-                sampling_rate=meta["sampling_rate"],
-                sample_format=meta["sample_format"],
-                isPCM=meta["isPCM"],
-                n_channel=meta["n_channel"],
-                format=meta["format"],
-                peak_volume_db=meta["peak_volume_db"],
-                size=meta["size"],
-                isValid=meta["isValid"],
-            )
+                    meta = evaluate_audio(row["local_path"])
 
-            db.session.add(sample)
-        db.session.commit()
-    app_logger.info(f"POSTGRES: Uploaded {len(df)} samples to dataset {dataset_id}")
+                    sample = Sample(
+                        dataset_id=dataset_id,
+                        filename=row["file_name"],
+                        s3url=f"s3://{bucket_name}/{row['s3path']}",
+                        original_text=row["text"],
+                        asr_text=None,
+                        duration=meta["duration"],
+                        trim_start=None,
+                        trim_end=None,
+                        sentence_type=row["sentence_type"],
+                        sentence_length=row["sentence_length"],
+                        sampling_rate=meta["sampling_rate"],
+                        sample_format=meta["sample_format"],
+                        isPCM=meta["isPCM"],
+                        n_channel=meta["n_channel"],
+                        format=meta["format"],
+                        peak_volume_db=meta["peak_volume_db"],
+                        size=meta["size"],
+                        isValid=meta["isValid"],
+                        wer=None,
+                    )
+
+                    db.session.add(sample)
+                    db.session.commit()
+                    s3.upload_file(row["local_path"], bucket_name, row["s3path"])
+        except Exception as e:
+            app_logger.error(f"POSTGRES: Error uploading sample {row['file_name']}: {e}")
+            failed.append(row["file_name"])
+            continue
+    app_logger.info(f"POSTGRES: Failed to upload {len(failed)} samples: {failed}")
+    app_logger.info(f"POSTGRES: Successfully uploaded {len(df) - len(failed)} samples")

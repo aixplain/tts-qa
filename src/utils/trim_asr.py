@@ -1,11 +1,15 @@
-# cooecnt to sqlalchedemy and create a session
-
 import os
+import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from tqdm import tqdm
+
+
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
 
 from src.logger import root_logger
 from src.paths import paths
@@ -21,7 +25,7 @@ load_dotenv(os.path.join(BASE_DIR, "var.env"))
 
 
 # get engine from url
-POSTGRES_URL = os.getenv("POSTGRES_URL")
+POSTGRES_URL = f"postgresql+psycopg2://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_HOST')}/{os.getenv('POSTGRES_DB')}"
 
 engine = create_engine(POSTGRES_URL)
 Session = sessionmaker(bind=engine)

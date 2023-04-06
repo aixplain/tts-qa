@@ -1,3 +1,4 @@
+import asyncio
 from typing import List, Union
 
 from fastapi import APIRouter
@@ -63,13 +64,19 @@ def update_dataset(id: int, name: str = None, language: str = None, description:
 
 # list all samples
 @router.get("/{id}/samples")
-def list_samples(id: int) -> List[SampleModel]:
-    samples = db_utils.list_samples(id)
+def list_samples(id: int, top_k=50) -> List[SampleModel]:
+    samples = db_utils.list_samples(id, top_k)
     # map the samples to the SampleModel
     return [SampleModel(**sample.to_dict()) for sample in samples]
 
 
+def handle_exceptions(task: asyncio.Task):
+    if task.exception():
+        print(f"An error occurred in the task: {task.exception()}")
+
+
 @router.get("/{id}/upload_from_csv")
-def upload(id, csv_path: str):
-    db_utils.upload_wav_samples(id, csv_path)
-    return {"message": "Process has been triggered."}
+async def upload(id, csv_path: str):
+    task = asyncio.create_task(db_utils.upload_wav_samples(id, csv_path))
+    task.add_done_callback(handle_exceptions)
+    return {"message": "Process triggered"}

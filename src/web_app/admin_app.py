@@ -1,24 +1,12 @@
-import pandas as pd
 import streamlit as st
-
-# Custom imports
-from multipage import MultiPage
-from pages import create_dataset
+from pages.create_dataset import app as create_dataset_app
+from pages.dataset_investigate import app as dataset_investigate_app
 
 
-st.set_page_config(layout="wide")
+page_names_to_funcs = {
+    "Create Dataset": create_dataset_app,
+    "Investigate Dataset": dataset_investigate_app,
+}
 
-
-# Create an instance of the app
-app = MultiPage()
-
-# Title of the main page
-# st.title("Data Centric AI")
-
-# Add all your applications (pages) here
-# app.add_page("Create Project", create_project.app)
-# app.add_page("Dataset Upload", dataset_upload.app)
-# app.add_page("Review", review.app)
-app.add_page("Create Dataset", create_dataset.app)
-# The main app
-app.run()
+demo_name = st.sidebar.radio("TTS QA Menu", page_names_to_funcs.keys())
+page_names_to_funcs[demo_name]()

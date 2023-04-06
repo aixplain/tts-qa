@@ -36,14 +36,14 @@ lang_map = {
 app_logger = root_logger.getChild("web_app::create_dataset")
 BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.get("SERVER_PORT"))
 
-# set wide layout
-st.set_page_config(layout="wide")
-
-sample_df = pd.read_csv(os.path.join(BASE_DIR, "src", "web_app", "data", "sample_csv.csv"))
-sample_zip_path = os.path.join(BASE_DIR, "src", "web_app", "data", "sample_zip.zip")
-
 
 def app():
+    # set wide layout
+    # st.set_page_config(layout="wide")
+
+    sample_df = pd.read_csv(os.path.join(BASE_DIR, "src", "web_app", "data", "sample_csv.csv"))
+    sample_zip_path = os.path.join(BASE_DIR, "src", "web_app", "data", "sample_zip.zip")
+
     st.title("TTS Datasets")
     st.write("Create a new TTS dataset or select an existing one")
     if "dataset" not in st.session_state:
@@ -122,44 +122,59 @@ def app():
                 if uploaded_file is not None and uploaded_zip_file is not None:
                     if st.button("Upload"):
                         # read csv file
-                        csv = pd.read_csv(uploaded_file)
-                        # read and unzip zip file
-                        zip_bytes = uploaded_zip_file.read()
-                        zip_file = io.BytesIO(zip_bytes)
-                        # extract zip file to temp directory
-                        tempdir = tempfile.TemporaryDirectory()
-                        temp_dir = tempdir.name
-                        with zipfile.ZipFile(zip_file, "r") as zip_ref:
-                            zip_ref.extractall(temp_dir)
-                        # get all wav files in temp directory
-                        wav_files = glob(os.path.join(temp_dir, "**", "*.wav"), recursive=True)
-
-                        # create a dataframe with the wav files
-                        wav_df = pd.DataFrame(wav_files, columns=["local_path"])
-                        # add the filename
-                        wav_df["file_name"] = wav_df["local_path"].apply(lambda x: os.path.basename(x))
-
-                        # merge the csv and the wav dataframe
-                        df = pd.merge(wav_df, csv, on="file_name", how="left")
-                        # check if all files were found
-                        not_found_files = df[df["local_path"].isnull()]["file_name"].tolist()
-
-                        if len(not_found_files) > 0:
-                            st.write("The following files were not found in the csv file:")
-                            st.write(not_found_files)
+                        csv = pd.read_csv(uploaded_file, delimiter=";", usecols=["unique_identifier", "text", "sentence_length", "sentence_type"])
+                        if csv[csv.isnull().any(axis=1)].shape[0] > 0:
+                            st.error("CSV file contains NaN values")
                         else:
-                            # save df to a local dir
-                            csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
-                            df.to_csv(csv_dir, index=False)
-                            # preprocess all files and save them to the database
-                            st.write("Uploading files to database...")
-                            params = {
-                                "wavs_path": temp_dir,
-                                "csv_path": csv_dir,
-                            }
+                            csv["file_name"] = csv["unique_identifier"].apply(lambda x: x + ".wav" if not x.endswith(".wav") else x)
+                            # read and unzip zip file
+                            zip_bytes = uploaded_zip_file.read()
+                            zip_file = io.BytesIO(zip_bytes)
+                            # extract zip file to temp directory
+                            tempdir = tempfile.TemporaryDirectory()
+                            temp_dir = tempdir.name
+                            with zipfile.ZipFile(zip_file, "r") as zip_ref:
+                                zip_ref.extractall(temp_dir)
+                            # get all wav files in temp directory
+                            wav_files = glob(os.path.join(temp_dir, "**", "*.wav"), recursive=True)
 
-                            response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)
-                            st.write(response.json())
+                            # create a dataframe with the wav files
+                            wav_df = pd.DataFrame(wav_files, columns=["local_path"])
+                            # add the filename
+                            wav_df["file_name"] = wav_df["local_path"].apply(lambda x: os.path.basename(x))
 
+                            # merge the csv and the wav dataframe
+                            df = pd.merge(wav_df, csv, on="file_name", how="left")
+                            # check if all files were found
+                            not_found_files = df[df["text"].isnull()]["file_name"].tolist()
 
-app()
+                            if len(not_found_files) > 0:
+                                st.write("The following files were not found in the csv file:")
+                                st.write(not_found_files)
+                                st.warning("Please make sure that the file names in the csv file match the file names in the zip file")
+                            else:
+                                # save df to a local dir
+                                csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
+                                df.to_csv(csv_dir, index=False)
+                                # preprocess all files and save them to the database
+                                st.write("Uploading files to database...")
+                                params = {
+                                    "wavs_path": temp_dir,
+                                    "csv_path": csv_dir,
+                                }
+
+                                response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)
+                                st.write(response.json())
+                                # if response.status_code == 200:
+                                #     r = response.json()
+                                #     if r["message"] == "Success":
+                                #         failed_files = r["failed_samples"]
+                                #         n_success = r["n_success"]
+
+                                #         if len(failed_files) > 0:
+                                #             st.write("The following files could not be uploaded:")
+                                #             st.write(failed_files)
+                                #             st.warning("Please make sure to save the files list and upload the files again later")
+                                #         st.success(f"{n_success} files uploaded successfully")
+                                #     else:
+                                #         st.error("Something went wrong")

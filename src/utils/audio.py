@@ -1,7 +1,9 @@
 import os
 import time
 
+import librosa
 import pandas as pd
+import soundfile as sf
 from aixtend.factories.model_factory import ModelFactory
 from pydub import AudioSegment
 from pydub.utils import mediainfo
@@ -113,3 +115,38 @@ def evaluate_audio(path):
         is_valid = True
     response["isValid"] = is_valid
     return response
+
+
+#  convert the sampling rate to 88kHz
+def convert_to_88k(path, out_path):
+    y, sr = librosa.load(path, sr=None)
+    y_88k = librosa.resample(y, orig_sr=sr, target_sr=88000)
+    sf.write(out_path, y_88k, 88000)
+    return out_path
+
+
+# normalize the audio peak_volume_db to be between -6 and -3 db
+def normalize_audio(path, out_path):
+    sound = AudioSegment.from_file(path, format="wav")
+    if sound.max_dBFS > -3:
+        normalized_sound = sound - (sound.max_dBFS + 3.5)
+    elif sound.max_dBFS < -6:
+        normalized_sound = sound + (-5.5 - sound.max_dBFS)
+    normalized_sound.export(out_path, format="wav")
+    return out_path
+
+
+# trim the audio using start end end time in secs
+def trim_audio(path, start, end, out_path):
+    sound = AudioSegment.from_file(path, format="wav")
+    trimmed_sound = sound[start * 1000 : end * 1000]
+    trimmed_sound.export(out_path, format="wav")
+    return out_path
+
+
+# convert the audio to mono
+def convert_to_mono(path, out_path):
+    sound = AudioSegment.from_file(path, format="wav")
+    mono_sound = sound.set_channels(1)
+    mono_sound.export(out_path, format="wav")
+    return out_path

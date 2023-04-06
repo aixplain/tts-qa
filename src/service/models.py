@@ -28,15 +28,11 @@ class Annotator(Base):  # type: ignore
 class Sample(Base):  # type: ignore
     __tablename__ = "sample"
     id = Column(Integer, primary_key=True, index=True)
-    dataset_id = Column(Integer, ForeignKey("dataset.id"), nullable=False)
-    filename = Column(String(50), unique=True, nullable=False)
+    dataset_id = Column(Integer, ForeignKey("dataset.id"))
+    filename = Column(String(50), unique=False, nullable=False)
     s3url = Column(String(120), unique=True, nullable=False)
     original_text = Column(String(120), unique=False, nullable=False)
-    asr_text = Column(String(120), unique=False, nullable=True)
     duration = Column(Float, unique=False, nullable=False)
-    trim_start = Column(Float, unique=False, nullable=True)
-    trim_end = Column(Float, unique=False, nullable=True)
-    longest_pause = Column(Float, unique=False, nullable=True)
     sentence_type = Column(String(50), unique=False, nullable=False)
     sentence_length = Column(Integer, unique=False, nullable=False)
     sampling_rate = Column(Integer, unique=False, nullable=False)
@@ -47,8 +43,15 @@ class Sample(Base):  # type: ignore
     peak_volume_db = Column(Float, unique=False, nullable=False)
     size = Column(Integer, unique=False, nullable=False)
     isValid = Column(Boolean, unique=False, nullable=False)
+    asr_text = Column(String(120), unique=False, nullable=True)
+    trim_start = Column(Float, unique=False, nullable=True)
+    trim_end = Column(Float, unique=False, nullable=True)
+    longest_pause = Column(Float, unique=False, nullable=True)
+    wer = Column(Float, unique=False, nullable=True)
 
-    __table_args__ = (UniqueConstraint("filename", "s3url", name="_filename_s3url_uc"),)
+    __table_args__ = (
+        UniqueConstraint("filename", "s3url", name="_filename_s3url_uc"),
+    )  # Example for such cases combination of filename and s3url should be unique
 
     def __repr__(self):
         return f"{self.to_dict()}"
@@ -60,11 +63,7 @@ class Sample(Base):  # type: ignore
             "filename": self.filename,
             "s3url": self.s3url,
             "original_text": self.original_text,
-            "asr_text": self.asr_text,
             "duration": self.duration,
-            "trim_start": self.trim_start,
-            "trim_end": self.trim_end,
-            "longest_pause": self.longest_pause,
             "sentence_type": self.sentence_type,
             "sentence_length": self.sentence_length,
             "sampling_rate": self.sampling_rate,
@@ -75,6 +74,11 @@ class Sample(Base):  # type: ignore
             "peak_volume_db": self.peak_volume_db,
             "size": self.size,
             "isValid": self.isValid,
+            "asr_text": self.asr_text,
+            "trim_start": self.trim_start,
+            "trim_end": self.trim_end,
+            "longest_pause": self.longest_pause,
+            "wer": self.wer,
         }
 
 
@@ -137,7 +141,7 @@ class Dataset(Base):  # type: ignore
     language = Column(String(5), unique=False, nullable=False)
     description = Column(String(250), unique=False, nullable=True)
     created_at = Column(DateTime, default=func.now())
-    samples = relationship("Sample", backref="dataset", cascade="all, delete, delete-orphan")
+    samples = relationship("Sample", cascade="all, delete", backref="dataset")
 
     __table_args__ = (UniqueConstraint("name", name="_name_uc"),)
 
