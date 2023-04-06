@@ -1,18 +1,14 @@
 import base64
-import configparser
-import datetime
 import io
 import os
-import pdb
 import sys
+import tempfile
+import zipfile
+from glob import glob
 
 import pandas as pd
 import requests
 import streamlit as st
-
-from glob import glob
-import tempfile
-import zipfile
 
 
 current_file_path = os.path.dirname(os.path.abspath(__file__))
@@ -48,8 +44,8 @@ sample_zip_path = os.path.join(BASE_DIR, "src", "web_app", "data", "sample_zip.z
 
 
 def app():
-    st.title("Create Dataset")
-    st.write("Create a new dataset or select an existing dataset")
+    st.title("TTS Datasets")
+    st.write("Create a new TTS dataset or select an existing one")
     if "dataset" not in st.session_state:
         st.session_state["dataset"] = {}
 
@@ -152,8 +148,18 @@ def app():
                             st.write("The following files were not found in the csv file:")
                             st.write(not_found_files)
                         else:
+                            # save df to a local dir
+                            csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
+                            df.to_csv(csv_dir, index=False)
                             # preprocess all files and save them to the database
                             st.write("Uploading files to database...")
+                            params = {
+                                "wavs_path": temp_dir,
+                                "csv_path": csv_dir,
+                            }
+
+                            response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)
+                            st.write(response.json())
 
 
 app()

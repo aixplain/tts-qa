@@ -1,6 +1,3 @@
-# pretty print
-from pprint import pprint
-
 from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, func, Integer, MetaData, String, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -20,7 +17,7 @@ class Annotator(Base):  # type: ignore
     __table_args__ = (UniqueConstraint("username", "email", name="_username_email_uc"),)
 
     def __repr__(self):
-        return pprint(self.to_dict())
+        return f"{self.to_dict()}"
 
     def to_dict(self):
         return {"id": self.id, "username": self.username, "email": self.email}
@@ -37,12 +34,24 @@ class Sample(Base):  # type: ignore
     original_text = Column(String(120), unique=False, nullable=False)
     asr_text = Column(String(120), unique=False, nullable=True)
     duration = Column(Float, unique=False, nullable=False)
+    trim_start = Column(Float, unique=False, nullable=True)
+    trim_end = Column(Float, unique=False, nullable=True)
+    longest_pause = Column(Float, unique=False, nullable=True)
     sentence_type = Column(String(50), unique=False, nullable=False)
+    sentence_length = Column(Integer, unique=False, nullable=False)
+    sampling_rate = Column(Integer, unique=False, nullable=False)
+    sample_format = Column(String(10), unique=False, nullable=False)
+    isPCM = Column(Boolean, unique=False, nullable=False)
+    n_channel = Column(Integer, unique=False, nullable=False)
+    format = Column(String(10), unique=False, nullable=False)
+    peak_volume_db = Column(Float, unique=False, nullable=False)
+    size = Column(Integer, unique=False, nullable=False)
+    isValid = Column(Boolean, unique=False, nullable=False)
 
     __table_args__ = (UniqueConstraint("filename", "s3url", name="_filename_s3url_uc"),)
 
     def __repr__(self):
-        return pprint(self.to_dict())
+        return f"{self.to_dict()}"
 
     def to_dict(self):
         return {
@@ -53,7 +62,19 @@ class Sample(Base):  # type: ignore
             "original_text": self.original_text,
             "asr_text": self.asr_text,
             "duration": self.duration,
+            "trim_start": self.trim_start,
+            "trim_end": self.trim_end,
+            "longest_pause": self.longest_pause,
             "sentence_type": self.sentence_type,
+            "sentence_length": self.sentence_length,
+            "sampling_rate": self.sampling_rate,
+            "sample_format": self.sample_format,
+            "isPCM": self.isPCM,
+            "n_channel": self.n_channel,
+            "format": self.format,
+            "peak_volume_db": self.peak_volume_db,
+            "size": self.size,
+            "isValid": self.isValid,
         }
 
 
@@ -87,7 +108,7 @@ class Annotation(Base):  # type: ignore
     __table_args__ = (UniqueConstraint("annotator_id", "sample_id", name="_annotator_sample_uc"),)
 
     def __repr__(self):
-        return pprint(self.to_dict())
+        return f"{self.to_dict()}"
 
     def to_dict(self):
         return {
@@ -121,14 +142,7 @@ class Dataset(Base):  # type: ignore
     __table_args__ = (UniqueConstraint("name", name="_name_uc"),)
 
     def __repr__(self):
-        return pprint(self.to_dict())
+        return f"{self.to_dict()}"
 
     def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "language": self.language,
-            "created_at": self.created_at,
-            "samples": [sample.to_dict() for sample in self.samples],
-        }
+        return {"id": self.id, "name": self.name, "description": self.description, "language": self.language, "created_at": self.created_at}

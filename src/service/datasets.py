@@ -55,9 +55,9 @@ def delete_dataset(id: int) -> Union[DatasetModel, InfoModel]:
 def update_dataset(id: int, name: str = None, language: str = None, description: str = None) -> Union[DatasetModel, InfoModel]:
     try:
         dataset = {"name": name, "language": language, "description": description}
-        dataset = db_utils.update_dataset(id, **dataset)
-        return DatasetModel(**dataset.to_dict())
-    except Exception as e:
+        dataset = db_utils.update_dataset(id, **dataset)  # type: ignore
+        return DatasetModel(**dataset.to_dict())  # type: ignore
+    except Exception as e:  # type: ignore
         return InfoModel(**{"message": "Failed", "error": str(e)})
 
 
@@ -67,3 +67,9 @@ def list_samples(id: int) -> List[SampleModel]:
     samples = db_utils.list_samples(id)
     # map the samples to the SampleModel
     return [SampleModel(**sample.to_dict()) for sample in samples]
+
+
+@router.get("/{id}/upload_from_csv")
+def upload(id, csv_path: str):
+    db_utils.upload_wav_samples(id, csv_path)
+    return {"message": "Process has been triggered."}

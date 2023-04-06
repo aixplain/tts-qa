@@ -1,12 +1,16 @@
 import os
 from typing import List
 
+import boto3
+import pandas as pd
 from dotenv import load_dotenv
 from fastapi_sqlalchemy import db
+from tqdm import tqdm
 
 from src.logger import root_logger
 from src.paths import paths
 from src.service.models import Annotation, Annotator, Dataset, Sample  # # noqa: F401
+from src.utils.audio import evaluate_audio
 
 
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
@@ -39,7 +43,9 @@ def create_dataset(name: str, language: str, description: str) -> Dataset:
 
         dataset = Dataset(name=name, language=language, description=description)
         db.session.add(dataset)
-        return dataset
+        db.session.commit()
+
+    return dataset
 
 
 def list_datasets() -> List[Dataset]:
@@ -50,7 +56,10 @@ def list_datasets() -> List[Dataset]:
     """
     app_logger.debug("POSTGRES: Listing datasets")
     with db.session.begin():
-        return db.session.query(Dataset).all()
+        datasets = db.session.query(Dataset).all()
+        db.session.commit()
+
+    return datasets
 
 
 def delete_dataset(id: int) -> None:
@@ -67,6 +76,7 @@ def delete_dataset(id: int) -> None:
             raise ValueError(f"Dataset {id} does not exist")
 
         db.session.query(Dataset).filter(Dataset.id == id).delete()
+        db.session.commit()
 
 
 def get_dataset_by_id(id: int) -> Dataset:
@@ -84,8 +94,9 @@ def get_dataset_by_id(id: int) -> Dataset:
         dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
         if not dataset:
             raise ValueError(f"Dataset {id} does not exist")
-
-        return db.session.query(Dataset).filter(Dataset.id == id).first()
+        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+        db.session.commit()
+    return dataset
 
 
 def update_dataset(id: int, **kwargs) -> None:
@@ -108,6 +119,7 @@ def update_dataset(id: int, **kwargs) -> None:
             if dataset:
                 raise ValueError(f"Dataset {kwargs['name']} already exists")
         db.session.query(Dataset).filter(Dataset.id == id).update(kwargs)
+        db.session.commit()
 
 
 ########################
@@ -123,7 +135,10 @@ def list_annotators() -> List[Annotator]:
     """
     app_logger.debug("POSTGRES: Listing annotators")
     with db.session.begin():
-        return db.session.query(Annotator).all()
+        annotators = db.session.query(Annotator).all()
+        db.session.commit()
+
+    return annotators
 
 
 def create_annotator(name: str) -> Annotator:
@@ -144,7 +159,8 @@ def create_annotator(name: str) -> Annotator:
 
         annotator = Annotator(name=name)
         db.session.add(annotator)
-        return annotator
+        db.session.commit()
+    return annotator
 
 
 def delete_annotator(id: int) -> None:
@@ -161,6 +177,7 @@ def delete_annotator(id: int) -> None:
             raise ValueError(f"Annotator {id} does not exist")
 
         db.session.query(Annotator).filter(Annotator.id == id).delete()
+        db.session.commit()
 
 
 def get_annotator_by_id(id: int) -> Annotator:
@@ -179,7 +196,9 @@ def get_annotator_by_id(id: int) -> Annotator:
         if not annotator:
             raise ValueError(f"Annotator {id} does not exist")
 
-        return db.session.query(Annotator).filter(Annotator.id == id).first()
+        annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
+        db.session.commit()
+    return annotator
 
 
 def update_annotator(id: int, **kwargs) -> None:
@@ -197,6 +216,7 @@ def update_annotator(id: int, **kwargs) -> None:
             raise ValueError(f"Annotator {id} does not exist")
 
         db.session.query(Annotator).filter(Annotator.id == id).update(kwargs)
+        db.session.commit()
 
 
 ########################
@@ -219,43 +239,62 @@ def update_sample(id: int, **kwargs) -> None:
             raise ValueError(f"Sample {id} does not exist")
 
         db.session.query(Sample).filter(Sample.id == id).update(kwargs)
+        db.session.commit()
 
 
 # Insert samples
-def insert_sample(id, sample: Sample) -> None:
-    """Insert a sample into the database.
+def insert_sample(
+    dataset_id: int,
+    wav_path: str,
+    text: str,
+) -> Sample:
+    """Insert a sample in the database.
 
     Args:
-        id (int): The dataset id to insert the sample into.
-        sample (Sample): The sample to insert.
-    """
-    app_logger.debug(f"POSTGRES: Inserting sample {sample.name}")
-    with db.session.begin():
-        # check if the dataset already exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {id} does not exist")
+        dataset_id (int): The dataset id.
+        wav_path (str): The wav path.
+        text (str): The text.
 
-        sample.id = id
+    Returns:
+        Sample: The sample inserted.
+    """
+
+    app_logger.debug(f"POSTGRES: Inserting sample {wav_path}")
+    with db.session.begin():
+        # check if the dataset exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
+        # check if the sample already exists
+        sample = db.session.query(Sample).filter(Sample.filename == wav_path).first()
+        if sample:
+            raise ValueError(f"Sample {wav_path} already exists")
+
+        # get the meta data
+        meta = evaluate_audio(wav_path)
+        sample = Sample(
+            dataset_id=dataset_id,
+            filename=wav_path,
+            s3url=None,
+            original_text=text,
+            asr_text=None,
+            duration=meta["duration"],
+            trim_start=None,
+            trim_end=None,
+            sentence_type=None,
+            sentence_length=None,
+            sampling_rate=meta["sampling_rate"],
+            sample_format=meta["sample_format"],
+            isPCM=meta["isPCM"],
+            n_channel=meta["n_channel"],
+            format=meta["format"],
+            peak_volume_db=meta["peak_volume_db"],
+            size=meta["size"],
+            isValid=meta["isValid"],
+        )
         db.session.add(sample)
-
-
-def insert_samples(id: int, samples: List[Sample]) -> None:
-    """Insert a list of samples into the database.
-
-    Args:
-        id (int): The dataset id to insert the samples into.
-        samples (List[Sample]): The samples to insert.
-    """
-    app_logger.debug(f"POSTGRES: Inserting {len(samples)} samples")
-    with db.session.begin():
-        # check if the dataset already exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {id} does not exist")
-
-        for sample in samples:
-            insert_samples(id, sample)
+        db.session.commit()
 
 
 def delete_sample(id: int) -> None:
@@ -272,22 +311,82 @@ def delete_sample(id: int) -> None:
             raise ValueError(f"Sample {id} does not exist")
 
         db.session.query(Sample).filter(Sample.id == id).delete()
+        db.session.commit()
 
 
-def list_samples(id: int) -> List[Sample]:
+def list_samples(dataset_id: int) -> List[Sample]:
     """List all the samples in the database.
 
     Args:
-        id (int): The dataset id to list the samples from.
+        dataset_id (int): The dataset id to list the samples from.
 
     Returns:
         List[Sample]: The list of samples.
     """
-    app_logger.debug(f"POSTGRES: Listing samples for dataset {id}")
+    app_logger.debug(f"POSTGRES: Listing samples for dataset {dataset_id}")
     with db.session.begin():
         # check if the dataset already exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
         if not dataset:
-            raise ValueError(f"Dataset {id} does not exist")
+            raise ValueError(f"Dataset {dataset_id} does not exist")
 
-        return db.session.query(Sample).filter(Sample.id == id).all()
+        samples = db.session.query(Sample).filter(Sample.id == dataset_id).all()
+        db.session.commit()
+
+    return samples
+
+
+def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
+
+    # get dataset
+    dataset = get_dataset_by_id(dataset_id)
+    dataset_name = dataset.name
+    bucket_name = os.environ.get("S3_BUCKET_NAME")
+    dataset_dir = os.environ.get("S3_DATASET_DIR")
+
+    # Simulate a long-running process
+    df = pd.read_csv(csv_path)
+    df["s3path"] = df["file_name"].apply(lambda x: os.path.join(dataset_dir, dataset_name, x))
+
+    s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"))
+
+    for _, row in df.iterrows():
+        # check if not there
+        # if not s3.head_object(Bucket=bucket_name, Key=row["s3path"])["ResponseMetadata"]["HTTPStatusCode"] == 200:
+        s3.upload_file(row["local_path"], bucket_name, row["s3path"])
+
+    # make sure that db is closed
+    db.session.close()
+    with db.session.begin():
+        # Check if the dataset already exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
+        # get_metadata of each sample using evaluate_audio method that return dict
+        for i, row in tqdm(df.iterrows(), total=len(df)):
+            meta = evaluate_audio(row["local_path"])
+            sample = Sample(
+                dataset_id=dataset_id,
+                filename=row["file_name"],
+                s3url=f"s3://{bucket_name}/{row['s3path']}",
+                original_text=row["text"],
+                asr_text=None,
+                duration=meta["duration"],
+                trim_start=None,
+                trim_end=None,
+                sentence_type=row["sentence_type"],
+                sentence_length=row["sentence_length"],
+                sampling_rate=meta["sampling_rate"],
+                sample_format=meta["sample_format"],
+                isPCM=meta["isPCM"],
+                n_channel=meta["n_channel"],
+                format=meta["format"],
+                peak_volume_db=meta["peak_volume_db"],
+                size=meta["size"],
+                isValid=meta["isValid"],
+            )
+
+            db.session.add(sample)
+        db.session.commit()
+    app_logger.info(f"POSTGRES: Uploaded {len(df)} samples to dataset {dataset_id}")
