@@ -113,6 +113,7 @@ class Dataset(Base):  # type: ignore
     __tablename__ = "dataset"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), unique=True, nullable=False)
+    language = Column(String(5), unique=False, nullable=False)
     description = Column(String(250), unique=False, nullable=True)
     created_at = Column(DateTime, default=func.now())
     samples = relationship("Sample", backref="dataset", cascade="all, delete, delete-orphan")
@@ -127,6 +128,7 @@ class Dataset(Base):  # type: ignore
             "id": self.id,
             "name": self.name,
             "description": self.description,
+            "language": self.language,
             "created_at": self.created_at,
             "samples": [sample.to_dict() for sample in self.samples],
         }

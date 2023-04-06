@@ -36,7 +36,7 @@ class DatasetModel(BaseDatasetModel):  # type: ignore
     pass
 
 
-class FailedCallModel(BaseModel):
+class InfoModel(BaseModel):
     """The error model."""
 
     message: str = Field(..., description="The error message")
@@ -50,19 +50,3 @@ class FailedCallModel(BaseModel):
                 "error": "The dataset does not exist",
             }
         }
-
-
-class SuccessfulCallModel(BaseModel):
-    """The error model."""
-
-    message: str = Field(..., description="The error message")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "message": "Success",
-            }
-        }
-
-
-InfoModel = Union[FailedCallModel, SuccessfulCallModel]
