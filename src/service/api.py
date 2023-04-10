@@ -7,6 +7,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src.logger import root_logger
 from src.paths import paths
+from src.service.annotators import router as annotators_router
 from src.service.datasets import router as datasets_router
 from src.service.samples import router as samples_router
 
@@ -34,6 +35,7 @@ app.logger = app_logger
 
 app.include_router(datasets_router)
 app.include_router(samples_router)
+app.include_router(annotators_router)
 
 
 @app.get("/")

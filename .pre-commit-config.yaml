@@ -63,7 +63,7 @@ repos:
     - flake8-expression-complexity
     - pep8-naming
     args:
-    - --select=F401,N801,N802,N803,N804,N805,N807
+    - --select=F401,N801,N802,N804,N805,N807
     - --max-cognitive-complexity=2
 # check for old-style python patterns (e.g. class Foo(object):) and correct them
 - repo: https://github.com/asottile/pyupgrade

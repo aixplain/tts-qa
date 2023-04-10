@@ -178,3 +178,6 @@ def app():
                                 #         st.success(f"{n_success} files uploaded successfully")
                                 #     else:
                                 #         st.error("Something went wrong")
+
+
+app()

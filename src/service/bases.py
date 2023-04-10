@@ -1,5 +1,3 @@
-from typing import Union
-
 from pydantic import BaseModel, Field
 from pydantic_sqlalchemy import sqlalchemy_to_pydantic
 
@@ -50,3 +48,19 @@ class InfoModel(BaseModel):
                 "error": "The dataset does not exist",
             }
         }
+
+
+class InputAnnotationModel(BaseModel):
+    """The input annotation model."""
+
+    annotator_id: int = Field(..., description="The annotator id")
+    final_text: str = Field(..., description="The final text")
+    isAccentRight: bool = Field(..., description="The accent is right")
+    isPronunciationRight: bool = Field(..., description="The pronunciation is right")
+    isTypeRight: bool = Field(..., description="The type is right")
+    isClean: bool = Field(..., description="The sample is clean")
+    isPausesRight: bool = Field(..., description="The pauses are right")
+    isSpeedRight: bool = Field(..., description="The speed is right")
+    isConsisent: bool = Field(..., description="The sample is consistent")
+    feedback: str = Field(default=None, description="The feedback")
+    status: str = Field(default="NotReviewed", description="The status")

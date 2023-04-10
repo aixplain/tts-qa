@@ -60,7 +60,7 @@ def app():
             "id",
             "dataset_id",
             "filename",
-            "s3url",
+            "s3RawPath",
             "original_text",
             "asr_text",
             "duration",
@@ -85,3 +85,6 @@ def app():
         # df_samples = df_samples.sort_values(by="wer", ascending=False)
         st.write(f"Dataset: {selected_dataset_name}")
         st.table(df_samples)
+
+
+app()

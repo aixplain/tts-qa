@@ -1,6 +1,7 @@
 import os
 
 import boto3
+import jiwer
 
 
 # define a class map
@@ -20,3 +21,7 @@ def upload_to_s3(bucket_name, object_path, file_path):
 
     s3.upload_file(file_path, bucket_name, object_path)
     return f"s3://{bucket_name}/{object_path}"
+
+
+def calculate_wer(reference, hypothesis):
+    return jiwer.wer(reference, hypothesis)

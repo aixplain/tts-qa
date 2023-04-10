@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from src.logger import root_logger
 from src.paths import paths
-from src.service.models import Annotation, Annotator, Dataset, Sample  # # noqa: F401
+from src.service.models import Annotation, Annotator, Dataset, Sample, Status  # noqa: F401
 from src.utils.audio import convert_to_88k, convert_to_mono, evaluate_audio, normalize_audio, trim_audio  # noqa: F401
 
 
@@ -20,6 +20,8 @@ BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
 load_dotenv(os.path.join(BASE_DIR, "vars.env"))
 
 app_logger = root_logger.getChild("db_utils")
+s3_bucket_name = os.environ.get("S3_BUCKET_NAME")
+s3_dataset_dir = os.environ.get("S3_DATASET_DIR")
 
 
 ########################
@@ -45,6 +47,18 @@ def create_dataset(name: str, language: str, description: str) -> Dataset:
 
         dataset = Dataset(name=name, language=language, description=description)
         db.session.add(dataset)
+        # create paths for the dataset
+        dataset_path = paths.LOCAL_BUCKET_DIR / s3_dataset_dir / dataset.name
+        dataset_path.mkdir(parents=True, exist_ok=True)
+
+        # raw paths
+        raw_path = dataset_path / "raw"
+        raw_path.mkdir(parents=True, exist_ok=True)
+
+        # trimmed
+        trimmed_path = dataset_path / "trimmed"
+        trimmed_path.mkdir(parents=True, exist_ok=True)
+
         db.session.commit()
 
     return dataset
@@ -79,6 +93,11 @@ def delete_dataset(id: int) -> None:
 
         dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
         db.session.delete(dataset)
+
+        # delete the dataset folder
+        dataset_path = paths.LOCAL_BUCKET_DIR / s3_dataset_dir / dataset.name
+        shutil.rmtree(dataset_path)
+
         db.session.commit()
 
 
@@ -144,25 +163,27 @@ def list_annotators() -> List[Annotator]:
     return annotators
 
 
-def create_annotator(name: str) -> Annotator:
+def create_annotator(username: str, email: str) -> Annotator:
     """Create an annotator in the database.
 
     Args:
-        name (str): The name of the annotator.
+        username (str): The username of the annotator.
+        email (str): The email of the annotator.
 
     Returns:
         Annotator: The annotator created.
     """
-    app_logger.debug(f"POSTGRES: Creating annotator {name}")
+    app_logger.debug(f"POSTGRES: Creating annotator {username}")
     with db.session.begin():
         # check if the annotator already exists
-        annotator = db.session.query(Annotator).filter(Annotator.name == name).first()
+        annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
         if annotator:
-            raise ValueError(f"Annotator {name} already exists")
+            raise ValueError(f"Annotator {username} already exists")
 
-        annotator = Annotator(name=name)
+        annotator = Annotator(username=username, email=email)
         db.session.add(annotator)
         db.session.commit()
+
     return annotator
 
 
@@ -220,6 +241,8 @@ def update_annotator(id: int, **kwargs) -> None:
 
         db.session.query(Annotator).filter(Annotator.id == id).update(kwargs)
         db.session.commit()
+        # return the updated annotator
+        annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
 
 
 ########################
@@ -242,81 +265,6 @@ def update_sample(id: int, **kwargs) -> None:
             raise ValueError(f"Sample {id} does not exist")
 
         db.session.query(Sample).filter(Sample.id == id).update(kwargs)
-        db.session.commit()
-
-
-# Insert samples
-def insert_sample(
-    dataset_id: int,
-    wav_path: str,
-    text: str,
-    s3_bucket: str = None,
-    s3_key: str = None,
-) -> Sample:
-    """Insert a sample in the database.
-
-    Args:
-        dataset_id (int): The dataset id.
-        wav_path (str): The wav path.
-        text (str): The text.
-
-    Returns:
-        Sample: The sample inserted.
-    """
-
-    app_logger.debug(f"POSTGRES: Inserting sample {wav_path}")
-    with db.session.begin():
-        # check if the dataset exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {dataset_id} does not exist")
-
-        # check if the sample already exists
-        sample = db.session.query(Sample).filter(Sample.filename == wav_path).first()
-        if sample:
-            raise ValueError(f"Sample {wav_path} already exists")
-
-        # get the meta data
-        meta = evaluate_audio(wav_path)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filename = os.path.basename(wav_path)
-            postprocess_path = os.path.join(tmpdir, filename)
-            # copy the file to the temp directory
-            shutil.copy(wav_path, postprocess_path)
-            if meta["is_88khz"] == False:
-                convert_to_88k(postprocess_path, postprocess_path)
-
-            if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
-                normalize_audio(postprocess_path, postprocess_path)
-
-            if int(meta["n_channel"]) != 1:
-                convert_to_mono(postprocess_path, postprocess_path)
-
-            meta = evaluate_audio(postprocess_path)
-
-        sample = Sample(
-            dataset_id=dataset_id,
-            filename=wav_path,
-            s3url=f"s3://{s3_bucket}/{s3_key}",
-            original_text=text,
-            asr_text=None,
-            duration=meta["duration"],
-            trim_start=None,
-            trim_end=None,
-            sentence_type=None,
-            sentence_length=None,
-            sampling_rate=meta["sampling_rate"],
-            sample_format=meta["sample_format"],
-            isPCM=meta["isPCM"],
-            n_channel=meta["n_channel"],
-            format=meta["format"],
-            peak_volume_db=meta["peak_volume_db"],
-            size=meta["size"],
-            isValid=meta["isValid"],
-            wer=None,
-        )
-        db.session.add(sample)
         db.session.commit()
 
 
@@ -360,6 +308,111 @@ def list_samples(dataset_id: int, top_k: int = None) -> List[Sample]:
     return samples
 
 
+def get_sample_by_id(id: int) -> Sample:
+    """Get a sample by id.
+
+    Args:
+        id (int): The sample id.
+
+    Returns:
+        Sample: The sample.
+    """
+    app_logger.debug(f"POSTGRES: Getting sample {id}")
+    with db.session.begin():
+        # check if the sample exists
+        sample = db.session.query(Sample).filter(Sample.id == id).first()
+        if not sample:
+            raise ValueError(f"Sample {id} does not exist")
+
+    return sample
+
+
+def annotate_sample(
+    sample_id: int,
+    annotator_id: int,
+    final_text: str,
+    isAccentRight: bool,
+    isPronunciationRight: bool,
+    isTypeRight: bool,
+    isClean: bool,
+    isPausesRight: bool,
+    isSpeedRight: bool,
+    isConsisent: bool,
+    feedback: str,
+    status: str,
+) -> None:
+    """Annotate a sample in the database.
+
+    Args:
+        sample_id (int): The sample id to annotate.
+        annotator_id (int): The annotator id to annotate.
+        **kwargs: The fields to update.
+    """
+    app_logger.debug(f"POSTGRES: Annotating sample {sample_id}")
+    with db.session.begin():
+        # check if the sample exists
+        sample = db.session.query(Sample).filter(Sample.id == sample_id).first()
+        if not sample:
+            raise ValueError(f"Sample {sample_id} does not exist")
+
+        # check if the annotator exists
+        annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
+        if not annotator:
+            raise ValueError(f"Annotator {annotator_id} does not exist")
+
+        # create annotation
+        annotation = Annotation(
+            sample_id=sample_id,
+            annotator_id=annotator_id,
+            final_text=final_text,
+            isAccentRight=isAccentRight,
+            isPronunciationRight=isPronunciationRight,
+            isTypeRight=isTypeRight,
+            isClean=isClean,
+            isPausesRight=isPausesRight,
+            isSpeedRight=isSpeedRight,
+            isConsisent=isConsisent,
+            feedback=feedback,
+            status=Status(status),
+        )
+        db.session.add(annotation)
+        db.session.commit()
+
+
+def query_next_sample(dataset_id: int) -> List[Sample]:
+    """List all the samples in the database.
+
+    Args:
+        dataset_id (int): The dataset id to list the samples from.
+
+    Returns:
+        List[Sample]: The list of samples.
+    """
+    # this should query the net sample with highest wer in which  there is no annotation yet by checking the annotation table
+    app_logger.debug(f"POSTGRES: Listing samples for dataset {dataset_id}")
+    with db.session.begin():
+        # check if the dataset already exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
+        # join samples and annotations to get the next sample
+        all = (
+            db.session.query(Sample, Annotation)
+            .outerjoin(Annotation, Sample.id == Annotation.sample_id)
+            .filter(Sample.dataset_id == dataset_id)
+            .order_by(Sample.wer.desc())
+            .all()
+        )
+
+        # filter out the samples that have been annotated
+        samples = [sample for sample, annotation in all if annotation is None]
+
+    if len(samples) == 0:
+        return None
+    return samples[0]  # return the first sample
+
+
 async def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
 
     # get dataset
@@ -371,7 +424,7 @@ async def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
     # Simulate a long-running process
     df = pd.read_csv(csv_path)
 
-    df["s3path"] = df["file_name"].apply(lambda x: os.path.join(dataset_dir, dataset_name, x))
+    df["s3RawPath"] = df["file_name"].apply(lambda x: os.path.join(dataset_dir, dataset_name, "raw", x))
 
     s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"))
 
@@ -389,26 +442,30 @@ async def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
                 meta = evaluate_audio(row["local_path"])
                 with tempfile.TemporaryDirectory() as tmpdir:
                     filename = os.path.basename(row["local_path"])
-                    postprocess_path = os.path.join(tmpdir, filename)
+                    # pdb.set_trace()
+                    local_path = os.path.join(str(paths.LOCAL_BUCKET_DIR.resolve()), row["s3RawPath"])
                     # copy the file to the temp directory
-                    shutil.copy(row["local_path"], postprocess_path)
+                    shutil.copy(row["local_path"], local_path)
                     if meta["is_88khz"] == False:
-                        convert_to_88k(row["local_path"], row["local_path"])
+                        convert_to_88k(row["local_path"], local_path)
 
                     if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
-                        normalize_audio(row["local_path"], row["local_path"])
+                        normalize_audio(local_path, local_path)
 
-                    meta = evaluate_audio(row["local_path"])
+                    meta = evaluate_audio(local_path)
 
                     sample = Sample(
                         dataset_id=dataset_id,
-                        filename=row["file_name"],
-                        s3url=f"s3://{bucket_name}/{row['s3path']}",
+                        filename=filename,
+                        local_path=local_path,
+                        s3RawPath=f"s3://{bucket_name}/{row['s3RawPath']}",
+                        s3TrimmedPath=None,
                         original_text=row["text"],
                         asr_text=None,
                         duration=meta["duration"],
                         trim_start=None,
                         trim_end=None,
+                        trimmed_audio_duration=None,
                         sentence_type=row["sentence_type"],
                         sentence_length=row["sentence_length"],
                         sampling_rate=meta["sampling_rate"],
@@ -423,11 +480,88 @@ async def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
                     )
 
                     db.session.add(sample)
+                    s3.upload_file(row["local_path"], bucket_name, row["s3RawPath"])
                     db.session.commit()
-                    s3.upload_file(row["local_path"], bucket_name, row["s3path"])
         except Exception as e:
             app_logger.error(f"POSTGRES: Error uploading sample {row['file_name']}: {e}")
             failed.append(row["file_name"])
             continue
     app_logger.info(f"POSTGRES: Failed to upload {len(failed)} samples: {failed}")
     app_logger.info(f"POSTGRES: Successfully uploaded {len(df) - len(failed)} samples")
+
+
+def insert_sample(
+    dataset_id: int,
+    text: str,
+    audio_path: str,
+    sentence_type: str,
+    sentence_length: int,
+):
+    """Insert a new sample into the database.
+
+    Args:
+        dataset_id (int): The dataset id to insert the sample into.
+        text (str): The text of the sample.
+        audio_path (str): The path to the audio file of the sample.
+
+    Returns:
+        Sample: The inserted sample.
+    """
+    dataset = get_dataset_by_id(dataset_id)
+    dataset_name = dataset.name
+    bucket_name = os.environ.get("S3_BUCKET_NAME")
+    dataset_dir = os.environ.get("S3_DATASET_DIR")
+    s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"))
+
+    app_logger.debug(f"POSTGRES: Inserting sample for dataset {dataset_id}")
+    with db.session.begin():
+        # check if the dataset already exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
+        if not os.path.exists(audio_path):
+            raise ValueError(f"Audio file {audio_path} does not exist. Please check the path.")
+
+        objectkey = os.path.join(dataset_dir, dataset_name, "raw", audio_path)
+        local_path = os.path.join(str(paths.LOCAL_BUCKET_DIR.resolve()), objectkey)
+        # preprocess the audio file
+        meta = evaluate_audio(audio_path)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.basename(audio_path)
+            # copy the file to the temp directory
+            shutil.copy(audio_path, local_path)
+            if meta["is_88khz"] == False:
+                convert_to_88k(local_path, local_path)
+
+            if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
+                normalize_audio(local_path, local_path)
+
+            meta = evaluate_audio(local_path)
+
+            sample = Sample(
+                dataset_id=dataset_id,
+                filename=filename,
+                local_path=local_path,
+                original_text=text,
+                asr_text=None,
+                duration=meta["duration"],
+                trim_start=None,
+                trim_end=None,
+                trimmed_audio_duration=None,
+                sentence_type=sentence_type,
+                sentence_length=sentence_length,
+                sampling_rate=meta["sampling_rate"],
+                sample_format=meta["sample_format"],
+                isPCM=meta["isPCM"],
+                n_channel=meta["n_channel"],
+                format=meta["format"],
+                peak_volume_db=meta["peak_volume_db"],
+                size=meta["size"],
+                isValid=meta["isValid"],
+                wer=None,
+            )
+
+            db.session.add(sample)
+            s3.upload_file(local_path, bucket_name, objectkey)
+            db.session.commit()

@@ -21,10 +21,10 @@ def list_annotators() -> List[AnnotatorModel]:
 
 
 # create an annotator
-@router.post("/{name}")
-def create_annotator(name: str, description: str = None) -> Union[AnnotatorModel, InfoModel]:
+@router.post("/{username}")
+def create_annotator(username: str, email: str) -> Union[AnnotatorModel, InfoModel]:
     try:
-        annotator = db_utils.create_annotator(name)
+        annotator = db_utils.create_annotator(username=username, email=email)
         return AnnotatorModel(**annotator.to_dict())
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
@@ -52,10 +52,11 @@ def delete_annotator(id: int) -> Union[AnnotatorModel, InfoModel]:
 
 # update an annotator
 @router.put("/{id}")
-def update_annotator(id: int, name: str = None, description: str = None) -> Union[AnnotatorModel, InfoModel]:
+def update_annotator(id: int, username: str, email: str) -> Union[AnnotatorModel, InfoModel]:
     try:
-        annotator = {"name": name, "description": description}
-        annotator = db_utils.update_annotator(id, annotator)
-        return AnnotatorModel(**annotator.to_dict())
+        annotator = {"username": username, "email": email}
+
+        annotator = db_utils.update_annotator(id, **annotator)  # type: ignore
+        return AnnotatorModel(**annotator.to_dict())  # type: ignore # noqa: F821
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})

@@ -7,7 +7,8 @@ now_str = datetime.strftime(datetime.now(), "%Y-%m-%d_%H-%M-%S")
 
 class Paths:
     PROJECT_ROOT_DIR = Path(__file__).parent.parent
-    DATASETS_DIR: Path =  Path("/data")
+    DATASETS_DIR: Path = Path("/data")
+    LOCAL_BUCKET_DIR: Path = Path("/data/tts-qa")
     OUTPUTS_DIR: Path = PROJECT_ROOT_DIR / "outputs"
     REPORTS_DIR: Path = PROJECT_ROOT_DIR / "reports"
     SRC_DIR: Path = PROJECT_ROOT_DIR / "src"

@@ -1,0 +1,16 @@
+.highlight {
+    border-radius: 0.4rem;
+    color: white;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .bold {
+    padding-left: 1rem;
+    font-weight: 700;
+  }
+  .green {
+    background-color: rgb(112, 207, 132);
+  }
+  .red {
+    background-color: rgb(235, 110, 110);
+  }

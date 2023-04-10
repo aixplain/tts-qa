@@ -1,9 +1,18 @@
+import enum
+
 from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, func, Integer, MetaData, String, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
 
 Base = declarative_base(metadata=MetaData())
+
+
+class Status(enum.Enum):
+    Reviewed = "Reviewed"
+    Discarded = "Discarded"
+    NotReviewed = "NotReviewed"
+
 
 # Define a Annotator model in qhich we will store the annotators's username and email address
 class Annotator(Base):  # type: ignore
@@ -24,15 +33,20 @@ class Annotator(Base):  # type: ignore
 
 
 # Define a Sample model in which we will store following nformation for an tts recording sample:
-# id, unique filename, s3url, original text, asr text, the duration of the recording, sentence_tyoe,
+# id, unique filename, s3RawPath, original text, asr text, the duration of the recording, sentence_tyoe,
 class Sample(Base):  # type: ignore
     __tablename__ = "sample"
     id = Column(Integer, primary_key=True, index=True)
     dataset_id = Column(Integer, ForeignKey("dataset.id"))
     filename = Column(String(50), unique=False, nullable=False)
-    s3url = Column(String(120), unique=True, nullable=False)
-    original_text = Column(String(120), unique=False, nullable=False)
+    local_path = Column(String(120), unique=False, nullable=False)
+    local_trimmed_path = Column(String(120), unique=False, nullable=True)
+    s3RawPath = Column(String(120), unique=True, nullable=False)
+    s3TrimmedPath = Column(String(120), unique=True, nullable=True)
+    original_text = Column(String(250), unique=False, nullable=False)
+    asr_text = Column(String(250), unique=False, nullable=True)
     duration = Column(Float, unique=False, nullable=False)
+    trimmed_audio_duration = Column(Float, unique=False, nullable=True)
     sentence_type = Column(String(50), unique=False, nullable=False)
     sentence_length = Column(Integer, unique=False, nullable=False)
     sampling_rate = Column(Integer, unique=False, nullable=False)
@@ -43,15 +57,13 @@ class Sample(Base):  # type: ignore
     peak_volume_db = Column(Float, unique=False, nullable=False)
     size = Column(Integer, unique=False, nullable=False)
     isValid = Column(Boolean, unique=False, nullable=False)
-    asr_text = Column(String(120), unique=False, nullable=True)
     trim_start = Column(Float, unique=False, nullable=True)
     trim_end = Column(Float, unique=False, nullable=True)
     longest_pause = Column(Float, unique=False, nullable=True)
     wer = Column(Float, unique=False, nullable=True)
-
     __table_args__ = (
-        UniqueConstraint("filename", "s3url", name="_filename_s3url_uc"),
-    )  # Example for such cases combination of filename and s3url should be unique
+        UniqueConstraint("filename", "s3RawPath", "s3TrimmedPath", name="_filename_s3RawPath_uc"),
+    )  # Example for such cases combination of filename and s3RawPath should be unique
 
     def __repr__(self):
         return f"{self.to_dict()}"
@@ -61,9 +73,13 @@ class Sample(Base):  # type: ignore
             "id": self.id,
             "dataset_id": self.dataset_id,
             "filename": self.filename,
-            "s3url": self.s3url,
+            "local_path": self.local_path,
+            "local_trimmed_path": self.local_trimmed_path,
+            "s3RawPath": self.s3RawPath,
+            "s3TrimmedPath": self.s3TrimmedPath,
             "original_text": self.original_text,
             "duration": self.duration,
+            "trimmed_audio_duration": self.trimmed_audio_duration,
             "sentence_type": self.sentence_type,
             "sentence_length": self.sentence_length,
             "sampling_rate": self.sampling_rate,
@@ -99,7 +115,8 @@ class Annotation(Base):  # type: ignore
     annotator_id = Column(Integer, ForeignKey("annotator.id"), nullable=False)
     sample_id = Column(Integer, ForeignKey("sample.id"), nullable=False)
     created_at = Column(DateTime, default=func.now())
-    status = Column(Enum("Approved", "Rejected", name="status"), default=None, nullable=True)
+    status = Column(Enum(Status), default=Status.NotReviewed)
+    final_text = Column(String(250), unique=False, nullable=True)
     isAccentRight = Column(Boolean, default=None, nullable=True)
     isPronunciationRight = Column(Boolean, default=None, nullable=True)
     isTypeRight = Column(Boolean, default=None, nullable=True)
@@ -121,6 +138,7 @@ class Annotation(Base):  # type: ignore
             "sample_id": self.sample_id,
             "created_at": self.created_at,
             "status": self.status,
+            "final_text": self.final_text,
             "isAccentRight": self.isAccentRight,
             "isPronunciationRight": self.isPronunciationRight,
             "isTypeRight": self.isTypeRight,

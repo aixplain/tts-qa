@@ -70,6 +70,31 @@ def list_samples(id: int, top_k=50) -> List[SampleModel]:
     return [SampleModel(**sample.to_dict()) for sample in samples]
 
 
+# insert a sample
+@router.post("/{id}/samples")
+def insert_sample(id: int, text: str, audio_path: str, sentence_length: int = None, sentence_type: str = "statement") -> Union[SampleModel, InfoModel]:
+    if sentence_length is None:
+        sentence_length = len(text.split())
+
+    try:
+        sample = db_utils.insert_sample(id, text, audio_path, sentence_type, sentence_length)
+        return SampleModel(**sample.to_dict())
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
+# query next sample
+@router.get("/{id}/next_sample")
+def query_next_sample(id: int) -> Union[SampleModel, InfoModel]:
+    try:
+        sample = db_utils.query_next_sample(id)
+        if sample is None:
+            return InfoModel(**{"message": "No more samples"})
+        return SampleModel(**sample.to_dict())  # type: ignore
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
 def handle_exceptions(task: asyncio.Task):
     if task.exception():
         print(f"An error occurred in the task: {task.exception()}")
