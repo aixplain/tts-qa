@@ -102,6 +102,6 @@ def handle_exceptions(task: asyncio.Task):
 
 @router.get("/{id}/upload_from_csv")
 async def upload(id, csv_path: str):
-    task = asyncio.create_task(db_utils.upload_wav_samples(id, csv_path))
-    task.add_done_callback(handle_exceptions)
-    return {"message": "Process triggered"}
+    failed, n_success = await db_utils.upload_wav_samples(id, csv_path)
+
+    return {"failed": failed, "n_success": n_success}

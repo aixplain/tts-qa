@@ -79,19 +79,22 @@ def app():
     if "user_input" not in st.session_state:
         st.session_state["user_input"] = {
             "final_text": "",
+            "final_sentence_type": "statement",
             "isAccentRight": False,
             "isPronunciationRight": False,
-            "isTypeRight": False,
             "isClean": False,
             "isPausesRight": False,
             "isSpeedRight": False,
             "isConsisent": False,
-            "feedback": None,
+            "feedback": "",
             "status": "NotReviewed",
         }
 
     if "query_button" not in st.session_state:
         st.session_state["query_button"] = True
+
+    if "annotate_button" not in st.session_state:
+        st.session_state["annotate_button"] = False
 
     if "isFirstRun" not in st.session_state:
         st.session_state["isFirstRun"] = True
@@ -101,6 +104,12 @@ def app():
 
     if "dataset_id" not in st.session_state:
         st.session_state["dataset_id"] = None
+
+    if "prev_annotator_id" not in st.session_state:
+        st.session_state["prev_annotator_id"] = None
+
+    if "prev_dataset_id" not in st.session_state:
+        st.session_state["prev_dataset_id"] = None
 
     if "datasets" not in st.session_state:
         datasets = get_datasets()
@@ -114,9 +123,9 @@ def app():
         id: int,
         annotator_id: int,
         final_text: str,
+        final_sentence_type: str,
         isAccentRight: bool,
         isPronunciationRight: bool,
-        isTypeRight: bool,
         isClean: bool,
         isPausesRight: bool,
         isSpeedRight: bool,
@@ -128,9 +137,9 @@ def app():
         data = {
             "annotator_id": annotator_id,
             "final_text": final_text,
+            "final_sentence_type": final_sentence_type,
             "isAccentRight": isAccentRight,
             "isPronunciationRight": isPronunciationRight,
-            "isTypeRight": isTypeRight,
             "isClean": isClean,
             "isPausesRight": isPausesRight,
             "isSpeedRight": isSpeedRight,
@@ -147,9 +156,11 @@ def app():
         return response
 
     def query():
-        if st.session_state["user_input"]["status"] in ["Discarded", "Reviewed"]:
-            st.session_state["user_input"].update({"id": st.session_state["sample"]["id"], "annotator_id": st.session_state["annotator_id"]})
-            response = annotate_sample(**st.session_state["user_input"])
+        if st.session_state["annotate_button"]:
+            if st.session_state["user_input"]["status"] in ["Discarded", "Reviewed"]:
+                st.session_state["user_input"].update({"id": st.session_state["sample"]["id"], "annotator_id": st.session_state["annotator_id"]})
+                response = annotate_sample(**st.session_state["user_input"])
+            st.session_state["annotate_button"] = False
 
         try:
             # send a request to get next sample
@@ -158,9 +169,10 @@ def app():
                 sample = response.json()
                 st.session_state["sample"] = sample
                 st.session_state["user_input"] = {
+                    "final_text": sample["final_text"],
+                    "final_sentence_type": sample["sentence_type"],
                     "isAccentRight": False,
                     "isPronunciationRight": False,
-                    "isTypeRight": False,
                     "isClean": False,
                     "isPausesRight": False,
                     "isSpeedRight": False,
@@ -179,10 +191,11 @@ def app():
     def sample_container(sample):
         container = st.container()
 
-        col1, col2, col3 = container.columns(3)
+        col1, col2, col3, col4 = container.columns(4)
         col1.metric("ID", sample["filename"])
-        col2.metric("Sentence Type", f"{'statement'.title()}")
+        col2.metric("Sentence Type", f"{sample['sentence_type']}")
         col3.metric("Length", "10")
+        col4.metric("WER", sample["wer"])
 
         container.markdown("---")
 
@@ -222,7 +235,13 @@ def app():
                 st.session_state["sample"][f"{better.lower()}_text"],
                 key=f"best_sys",
             )
+        sentence_type_list = ["Statement", "Question", "Exclamation"]
+        defult_idx = sentence_type_list.index(sample["sentence_type"].title())
+        sentence_type = st.radio("Sentence Type", sentence_type_list, key=f"sentence_type", index=defult_idx, horizontal=True)
+        st.session_state["user_input"]["final_sentence_type"] = sentence_type.lower()
 
+    st.session_state["prev_annotator_id"] = st.session_state["annotator_id"]
+    st.session_state["prev_dataset_id"] = st.session_state["dataset_id"]
     annotator_selected = st.sidebar.selectbox("Annotator", [a["username"] for a in st.session_state["annotators"]] + ["Create New"])
     if annotator_selected == "Create New":
         username = st.sidebar.text_input("Username")
@@ -247,6 +266,12 @@ def app():
         [d["name"] for d in st.session_state["datasets"]],
     )
     st.session_state["dataset_id"] = [d["id"] for d in st.session_state["datasets"] if d["name"] == st.session_state["dataset_id"]][0]
+
+    if st.session_state["prev_annotator_id"] != st.session_state["annotator_id"] or st.session_state["prev_dataset_id"] != st.session_state["dataset_id"]:
+        st.session_state["query_button"] = True
+        st.session_state["annotate_button"] = False
+        st.session_state["isFirstRun"] = True
+        st.experimental_rerun()
     # progress_status = st.sidebar.empty()
     # progress_bar = st.sidebar.empty()
     # Infomation on remaining and rated samples count
@@ -261,6 +286,8 @@ def app():
             st.session_state["isFirstRun"] = False
         elif st.session_state["query_button"]:
             query()
+            st.session_state["query_button"] = False
+            st.session_state["annotate_button"] = False
 
         if not st.session_state["isFirstRun"]:
             if "message" not in st.session_state["sample"]:
@@ -270,7 +297,6 @@ def app():
                 with st.form("my_form"):
                     isAccentRight = st.checkbox("Is the accent right?", value=st.session_state["user_input"]["isAccentRight"])
                     isPronunciationRight = st.checkbox("Is the pronunciation right?", value=st.session_state["user_input"]["isPronunciationRight"])
-                    isTypeRight = st.checkbox("Does the audio correspond to the sentence type?", value=st.session_state["user_input"]["isTypeRight"])
                     isClean = st.checkbox("Is the recording clean - no background noise?", value=st.session_state["user_input"]["isClean"])
                     isPausesRight = st.checkbox("Is the sound free of any distinct pauses?", value=st.session_state["user_input"]["isPausesRight"])
                     isSpeedRight = st.checkbox("Is the speed of the actor normal?", value=st.session_state["user_input"]["isSpeedRight"])
@@ -282,7 +308,6 @@ def app():
 
                     st.session_state["user_input"]["isAccentRight"] = isAccentRight
                     st.session_state["user_input"]["isPronunciationRight"] = isPronunciationRight
-                    st.session_state["user_input"]["isTypeRight"] = isTypeRight
                     st.session_state["user_input"]["isClean"] = isClean
                     st.session_state["user_input"]["isPausesRight"] = isPausesRight
                     st.session_state["user_input"]["isSpeedRight"] = isSpeedRight
@@ -301,6 +326,7 @@ def app():
                             st.session_state["user_input"]["status"] = status
                             st.success("Submitted!")
                             st.session_state["query_button"] = True
+                            st.session_state["annotate_button"] = True
                             st.experimental_rerun()
 
             else:

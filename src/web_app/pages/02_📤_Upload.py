@@ -49,6 +49,9 @@ def app():
     if "dataset" not in st.session_state:
         st.session_state["dataset"] = {}
 
+    if "failed_files" not in st.session_state:
+        st.session_state["failed_files"] = []
+
     def get_datasets():
         return requests.get(BACKEND_URL + "/datasets").json()
 
@@ -71,6 +74,7 @@ def app():
             dataset = requests.post(BACKEND_URL + f"/datasets/{dataset_name}", params=params).json()
             st.success("Dataset created successfully")
             st.session_state["dataset"] = dataset
+            st.experimental_rerun()
     else:
         # get selected dataset object
         selected_dataset = [dataset for dataset in datasets if dataset["name"] == selected_dataset_name][0]
@@ -121,12 +125,14 @@ def app():
                     uploaded_zip_file = st.file_uploader("Upload WAVs as zip", type=["zip"])
                 if uploaded_file is not None and uploaded_zip_file is not None:
                     if st.button("Upload"):
+                        st.session_state["failed_files"] = []
                         # read csv file
-                        csv = pd.read_csv(uploaded_file, delimiter=";", usecols=["unique_identifier", "text", "sentence_length", "sentence_type"])
+                        csv = pd.read_csv(uploaded_file, delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type"])
                         if csv[csv.isnull().any(axis=1)].shape[0] > 0:
                             st.error("CSV file contains NaN values")
                         else:
                             csv["file_name"] = csv["unique_identifier"].apply(lambda x: x + ".wav" if not x.endswith(".wav") else x)
+                            csv["file_name"] = csv["file_name"].apply(lambda x: x.upper().replace(".WAV", ".wav"))
                             # read and unzip zip file
                             zip_bytes = uploaded_zip_file.read()
                             zip_file = io.BytesIO(zip_bytes)
@@ -142,9 +148,11 @@ def app():
                             wav_df = pd.DataFrame(wav_files, columns=["local_path"])
                             # add the filename
                             wav_df["file_name"] = wav_df["local_path"].apply(lambda x: os.path.basename(x))
+                            wav_df["file_name"] = wav_df["file_name"].apply(lambda x: x.upper().replace(".WAV", ".wav"))
 
                             # merge the csv and the wav dataframe
                             df = pd.merge(wav_df, csv, on="file_name", how="left")
+
                             # check if all files were found
                             not_found_files = df[df["text"].isnull()]["file_name"].tolist()
 
@@ -164,20 +172,21 @@ def app():
                                 }
 
                                 response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)
-                                st.write(response.json())
-                                # if response.status_code == 200:
-                                #     r = response.json()
-                                #     if r["message"] == "Success":
-                                #         failed_files = r["failed_samples"]
-                                #         n_success = r["n_success"]
+                                if response.status_code == 200:
+                                    n_success = response.json()["n_success"]
+                                    st.session_state["failed_files"] = response.json()["failed"]
+                                    st.success(f"Successfully uploaded {n_success} files")
+                                    if len(st.session_state["failed_files"]) > 0:
+                                        st.write("The following files could not be uploaded retry to upload them:")
+                                        st.write(st.session_state["failed_files"])
+                                        # download
+                                        csv = pd.DataFrame(st.session_state["failed_files"], columns=["file_name"])
 
-                                #         if len(failed_files) > 0:
-                                #             st.write("The following files could not be uploaded:")
-                                #             st.write(failed_files)
-                                #             st.warning("Please make sure to save the files list and upload the files again later")
-                                #         st.success(f"{n_success} files uploaded successfully")
-                                #     else:
-                                #         st.error("Something went wrong")
+                                        b64 = base64.b64encode(csv.to_csv(index=False).encode()).decode()
+                                        href = f'<a href="data:file/csv;base64,{b64}" download="failed_files.csv">Download failed files</a>'
+                                        st.markdown(href, unsafe_allow_html=True)
+                                else:
+                                    st.error("An error occured while uploading the files")
 
 
 app()

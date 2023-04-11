@@ -55,9 +55,9 @@ class InputAnnotationModel(BaseModel):
 
     annotator_id: int = Field(..., description="The annotator id")
     final_text: str = Field(..., description="The final text")
+    final_sentence_type: str = Field(..., description="The final sentence type")
     isAccentRight: bool = Field(..., description="The accent is right")
     isPronunciationRight: bool = Field(..., description="The pronunciation is right")
-    isTypeRight: bool = Field(..., description="The type is right")
     isClean: bool = Field(..., description="The sample is clean")
     isPausesRight: bool = Field(..., description="The pauses are right")
     isSpeedRight: bool = Field(..., description="The speed is right")

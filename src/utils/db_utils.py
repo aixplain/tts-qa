@@ -1,12 +1,13 @@
 import os
 import shutil
 import tempfile
-from typing import List
+from typing import List, Tuple
 
 import boto3
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi_sqlalchemy import db
+from sqlalchemy import not_
 from tqdm import tqdm
 
 from src.logger import root_logger
@@ -93,12 +94,11 @@ def delete_dataset(id: int) -> None:
 
         dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
         db.session.delete(dataset)
+        db.session.commit()
 
         # delete the dataset folder
         dataset_path = paths.LOCAL_BUCKET_DIR / s3_dataset_dir / dataset.name
         shutil.rmtree(dataset_path)
-
-        db.session.commit()
 
 
 def get_dataset_by_id(id: int) -> Dataset:
@@ -331,9 +331,9 @@ def annotate_sample(
     sample_id: int,
     annotator_id: int,
     final_text: str,
+    final_sentence_type: str,
     isAccentRight: bool,
     isPronunciationRight: bool,
-    isTypeRight: bool,
     isClean: bool,
     isPausesRight: bool,
     isSpeedRight: bool,
@@ -365,9 +365,9 @@ def annotate_sample(
             sample_id=sample_id,
             annotator_id=annotator_id,
             final_text=final_text,
+            final_sentence_type=final_sentence_type,
             isAccentRight=isAccentRight,
             isPronunciationRight=isPronunciationRight,
-            isTypeRight=isTypeRight,
             isClean=isClean,
             isPausesRight=isPausesRight,
             isSpeedRight=isSpeedRight,
@@ -401,6 +401,15 @@ def query_next_sample(dataset_id: int) -> List[Sample]:
             db.session.query(Sample, Annotation)
             .outerjoin(Annotation, Sample.id == Annotation.sample_id)
             .filter(Sample.dataset_id == dataset_id)
+            .filter(
+                not_(
+                    (Sample.local_trimmed_path == None)
+                    | (Sample.local_path == None)
+                    | (Sample.s3TrimmedPath == None)
+                    | (Sample.s3RawPath == None)
+                    | (Sample.asr_text == None)
+                )
+            )
             .order_by(Sample.wer.desc())
             .all()
         )
@@ -413,7 +422,7 @@ def query_next_sample(dataset_id: int) -> List[Sample]:
     return samples[0]  # return the first sample
 
 
-async def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
+async def upload_wav_samples(dataset_id: int, csv_path: str) -> Tuple[List[str], int]:
 
     # get dataset
     dataset = get_dataset_by_id(dataset_id)
@@ -488,6 +497,7 @@ async def upload_wav_samples(dataset_id: int, csv_path: str) -> None:
             continue
     app_logger.info(f"POSTGRES: Failed to upload {len(failed)} samples: {failed}")
     app_logger.info(f"POSTGRES: Successfully uploaded {len(df) - len(failed)} samples")
+    return failed, len(df) - len(failed)
 
 
 def insert_sample(

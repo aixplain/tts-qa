@@ -75,9 +75,10 @@ def app():
                     st.session_state.csv.to_csv(os.path.join(SAVE_DIR_CSV, st.session_state.csv_name), index=False)
         else:
             # select a file
-            st.session_state.csv_name = option
-            st.session_state.csv = pd.read_csv(option, delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type"])
-            st.session_state.csv["record_status"] = "Not Recorded"
+            st.session_state.csv_name = os.path.basename(option)
+            st.session_state.csv = pd.read_csv(
+                os.path.join(SAVE_DIR_CSV, option), delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type", "record_status"]
+            )
 
     # now from the csv file, we go in order and record the audio if it is not recorded
     if st.session_state.csv is not None:

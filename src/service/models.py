@@ -61,6 +61,8 @@ class Sample(Base):  # type: ignore
     trim_end = Column(Float, unique=False, nullable=True)
     longest_pause = Column(Float, unique=False, nullable=True)
     wer = Column(Float, unique=False, nullable=True)
+
+    annotation = relationship("Annotation", cascade="all, delete-orphan", backref="sample")
     __table_args__ = (
         UniqueConstraint("filename", "s3RawPath", "s3TrimmedPath", name="_filename_s3RawPath_uc"),
     )  # Example for such cases combination of filename and s3RawPath should be unique
@@ -117,15 +119,14 @@ class Annotation(Base):  # type: ignore
     created_at = Column(DateTime, default=func.now())
     status = Column(Enum(Status), default=Status.NotReviewed)
     final_text = Column(String(250), unique=False, nullable=True)
+    final_sentence_type = Column(String(50), unique=False, nullable=True)
     isAccentRight = Column(Boolean, default=None, nullable=True)
     isPronunciationRight = Column(Boolean, default=None, nullable=True)
-    isTypeRight = Column(Boolean, default=None, nullable=True)
     isClean = Column(Boolean, default=None, nullable=True)
     isPausesRight = Column(Boolean, default=None, nullable=True)
     isSpeedRight = Column(Boolean, default=None, nullable=True)
     isConsisent = Column(Boolean, default=None, nullable=True)
     feedback = Column(String(250), unique=False, nullable=True)
-
     __table_args__ = (UniqueConstraint("annotator_id", "sample_id", name="_annotator_sample_uc"),)
 
     def __repr__(self):
@@ -139,9 +140,9 @@ class Annotation(Base):  # type: ignore
             "created_at": self.created_at,
             "status": self.status,
             "final_text": self.final_text,
+            "final_sentence_type": self.final_sentence_type,
             "isAccentRight": self.isAccentRight,
             "isPronunciationRight": self.isPronunciationRight,
-            "isTypeRight": self.isTypeRight,
             "isClean": self.isClean,
             "isPausesRight": self.isPausesRight,
             "isSpeedRight": self.isSpeedRight,
@@ -156,6 +157,7 @@ class Dataset(Base):  # type: ignore
     __tablename__ = "dataset"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), unique=True, nullable=False)
+    recorder = Column(String(50), unique=False, nullable=True)
     language = Column(String(5), unique=False, nullable=False)
     description = Column(String(250), unique=False, nullable=True)
     created_at = Column(DateTime, default=func.now())

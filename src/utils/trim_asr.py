@@ -59,6 +59,7 @@ def postprocess(session_, sample, language):
     sample.s3TrimmedPath = str(s3TrimmedPath)
     session_.add(sample)
     s3.upload_file(out_path, bucket_name, object_key)
+    session_.commit()
 
 
 def process_datasets():
@@ -68,7 +69,12 @@ def process_datasets():
         app_logger.info(f"Processing dataset: {dataset.name}")
 
         language = dataset.language
-        samples = session.query(Sample).filter(Sample.dataset_id == dataset.id).filter(Sample.asr_text == None).all()
+        samples = (
+            session.query(Sample)
+            .filter(Sample.dataset_id == dataset.id)
+            .filter((Sample.local_trimmed_path == None) | (Sample.local_path == None) | (Sample.s3TrimmedPath == None) | (Sample.s3RawPath == None))
+            .all()
+        )
         while len(samples) > 0:
             # for sample in tqdm(samples):
             #     # get asr_text
@@ -77,10 +83,14 @@ def process_datasets():
             with ThreadPoolExecutor(max_workers=10) as executor:
                 for sample in samples:
                     executor.submit(postprocess, session, sample, language)
-            # # commit changes
-            session.commit()
+
             # get samples with asr_text = null
-            samples = session.query(Sample).filter(Sample.dataset_id == dataset.id).filter(Sample.asr_text == None).all()
+            samples = (
+                session.query(Sample)
+                .filter(Sample.dataset_id == dataset.id)
+                .filter((Sample.local_trimmed_path == None) | (Sample.local_path == None) | (Sample.s3TrimmedPath == None) | (Sample.s3RawPath == None))
+                .all()
+            )
 
         app_logger.info(f"Finished processing dataset: {dataset.name}")
 
