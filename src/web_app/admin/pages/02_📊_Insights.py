@@ -10,7 +10,7 @@ import streamlit as st
 
 current_file_path = os.path.dirname(os.path.abspath(__file__))
 # aapedn 3 parent directories to the path
-sys.path.append(os.path.join(current_file_path, "..", "..", ".."))
+sys.path.append(os.path.join(current_file_path, "..", "..", "..", ".."))
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -38,8 +38,6 @@ BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.ge
 
 
 def app():
-    # set wide layout
-    # st.set_page_config(layout="wide")
 
     st.title("TTS Datasets")
 

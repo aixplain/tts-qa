@@ -13,7 +13,7 @@ import streamlit as st
 
 current_file_path = os.path.dirname(os.path.abspath(__file__))
 # aapedn 3 parent directories to the path
-sys.path.append(os.path.join(current_file_path, "..", "..", ".."))
+sys.path.append(os.path.join(current_file_path, "..", "..", "..", ".."))
 
 from dotenv import load_dotenv
 
@@ -38,11 +38,9 @@ BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.ge
 
 
 def app():
-    # set wide layout
-    # st.set_page_config(layout="wide")
 
-    sample_df = pd.read_csv(os.path.join(BASE_DIR, "src", "web_app", "data", "sample_csv.csv"))
-    sample_zip_path = os.path.join(BASE_DIR, "src", "web_app", "data", "sample_zip.zip")
+    sample_df = pd.read_csv(os.path.join(BASE_DIR, "src", "web_app", "admin", "data", "sample_csv.csv"))
+    sample_zip_path = os.path.join(BASE_DIR, "src", "web_app", "admin", "data", "sample_zip.zip")
 
     st.title("TTS Datasets")
     st.write("Create a new TTS dataset or select an existing one")

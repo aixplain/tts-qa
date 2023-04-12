@@ -7,16 +7,13 @@ import streamlit as st
 
 current_file_path = os.path.dirname(os.path.abspath(__file__))
 # aapedn 3 parent directories to the path
-sys.path.append(os.path.join(current_file_path, "..", "..", ".."))
+sys.path.append(os.path.join(current_file_path, "..", "..", "..", ".."))
 
 from dotenv import load_dotenv
 
 from src.logger import root_logger
 from src.paths import paths
 
-
-# st set wide mode
-st.set_page_config(layout="wide")
 
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
 # load the .env file

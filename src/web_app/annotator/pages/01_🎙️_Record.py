@@ -12,7 +12,8 @@ from src.utils.audio import convert_to_mono, normalize_audio
 
 current_file_path = os.path.dirname(os.path.abspath(__file__))
 # aapedn 3 parent directories to the path
-sys.path.append(os.path.join(current_file_path, "..", "..", ".."))
+sys.path.append(os.path.join(current_file_path, "..", "..", "..", ".."))
+
 from src.logger import root_logger
 from src.paths import paths
 
@@ -20,10 +21,10 @@ from src.paths import paths
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
 app_logger = root_logger.getChild("web_app::record")
 
-sample_df = pd.read_csv(os.path.join(BASE_DIR, "src", "web_app", "data", "sample_record.csv"))
+sample_df = pd.read_csv(os.path.join(BASE_DIR, "src", "web_app", "annotator", "data", "sample_record.csv"))
 
-SAVE_DIR_AUDIO = os.path.join(BASE_DIR, "src", "web_app", "data", "audio")
-SAVE_DIR_CSV = os.path.join(BASE_DIR, "src", "web_app", "data", "csv")
+SAVE_DIR_AUDIO = os.path.join(BASE_DIR, "src", "web_app", "annotator", "data", "audio")
+SAVE_DIR_CSV = os.path.join(BASE_DIR, "src", "web_app", "annotator", "data", "csv")
 
 
 def app():
@@ -56,29 +57,28 @@ def app():
     files = glob(os.path.join(SAVE_DIR_CSV, "*.csv"))
     files = [os.path.basename(f) for f in files]
     option = st.selectbox("Select a file or upload a file", files + ["Upload a file"])
-    if st.session_state.csv is None:
-        if option == "Upload a file":
-            # upload csv file
-            uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
-            if uploaded_file is not None:
-                # Name the file
-                st.session_state.csv_name = st.text_input("Name the file", value="recordings_1.csv")
-                csv = pd.read_csv(uploaded_file, delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type"])
-                if "record_status" not in csv.columns:
-                    csv["record_status"] = "Not Recorded"
-                if st.button("Upload"):
-                    st.session_state.csv = csv
-                    # check the audio files and update if needed
-                    audio_files_ids = [os.path.splitext(os.path.basename(f))[0] for f in glob(os.path.join(SAVE_DIR_AUDIO, "*.wav"))]
-                    # the ones in the audio_files shold be marked as recorded
-                    st.session_state.csv.loc[st.session_state.csv["unique_identifier"].isin(audio_files_ids), "record_status"] = "Recorded"
-                    st.session_state.csv.to_csv(os.path.join(SAVE_DIR_CSV, st.session_state.csv_name), index=False)
-        else:
-            # select a file
-            st.session_state.csv_name = os.path.basename(option)
-            st.session_state.csv = pd.read_csv(
-                os.path.join(SAVE_DIR_CSV, option), delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type", "record_status"]
-            )
+    if option == "Upload a file":
+        # upload csv file
+        uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+        if uploaded_file is not None:
+            # Name the file
+            st.session_state.csv_name = st.text_input("Name the file", value="recordings_1.csv")
+            csv = pd.read_csv(uploaded_file, delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type"])
+            if "record_status" not in csv.columns:
+                csv["record_status"] = "Not Recorded"
+            if st.button("Upload"):
+                st.session_state.csv = csv
+                # check the audio files and update if needed
+                audio_files_ids = [os.path.splitext(os.path.basename(f))[0] for f in glob(os.path.join(SAVE_DIR_AUDIO, "*.wav"))]
+                # the ones in the audio_files shold be marked as recorded
+                st.session_state.csv.loc[st.session_state.csv["unique_identifier"].isin(audio_files_ids), "record_status"] = "Recorded"
+                st.session_state.csv.to_csv(os.path.join(SAVE_DIR_CSV, st.session_state.csv_name), index=False)
+    else:
+        # select a file
+        st.session_state.csv_name = os.path.basename(option)
+        st.session_state.csv = pd.read_csv(
+            os.path.join(SAVE_DIR_CSV, option), delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type", "record_status"]
+        )
 
     # now from the csv file, we go in order and record the audio if it is not recorded
     if st.session_state.csv is not None:
@@ -112,6 +112,7 @@ def app():
                 if col2.button("Next"):
                     st.session_state.index = st.session_state.csv[st.session_state.csv["record_status"] == "Not Recorded"].index[0]
                     st.session_state.row = st.session_state.csv.loc[st.session_state.index]
+                    st.experimental_rerun()
 
 
 app()
