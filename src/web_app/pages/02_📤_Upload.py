@@ -159,34 +159,36 @@ def app():
                             if len(not_found_files) > 0:
                                 st.write("The following files were not found in the csv file:")
                                 st.write(not_found_files)
-                                st.warning("Please make sure that the file names in the csv file match the file names in the zip file")
+                                st.warning(
+                                    "Please make sure that the file names in the csv file match the file names in the zip file. Processing of the files will continue with the files that were found."
+                                )
+                            df = df.dropna(subset=["text"])
+                            # save df to a local dir
+                            csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
+                            df.to_csv(csv_dir, index=False)
+                            # preprocess all files and save them to the database
+                            st.write("Uploading files to database...")
+                            params = {
+                                "wavs_path": temp_dir,
+                                "csv_path": csv_dir,
+                            }
+
+                            response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)
+                            if response.status_code == 200:
+                                n_success = response.json()["n_success"]
+                                st.session_state["failed_files"] = response.json()["failed"]
+                                st.success(f"Successfully uploaded {n_success} files")
+                                if len(st.session_state["failed_files"]) > 0:
+                                    st.write("The following files could not be uploaded retry to upload them:")
+                                    st.write(st.session_state["failed_files"])
+                                    # download
+                                    csv = pd.DataFrame(st.session_state["failed_files"], columns=["file_name"])
+
+                                    b64 = base64.b64encode(csv.to_csv(index=False).encode()).decode()
+                                    href = f'<a href="data:file/csv;base64,{b64}" download="failed_files.csv">Download failed files</a>'
+                                    st.markdown(href, unsafe_allow_html=True)
                             else:
-                                # save df to a local dir
-                                csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
-                                df.to_csv(csv_dir, index=False)
-                                # preprocess all files and save them to the database
-                                st.write("Uploading files to database...")
-                                params = {
-                                    "wavs_path": temp_dir,
-                                    "csv_path": csv_dir,
-                                }
-
-                                response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)
-                                if response.status_code == 200:
-                                    n_success = response.json()["n_success"]
-                                    st.session_state["failed_files"] = response.json()["failed"]
-                                    st.success(f"Successfully uploaded {n_success} files")
-                                    if len(st.session_state["failed_files"]) > 0:
-                                        st.write("The following files could not be uploaded retry to upload them:")
-                                        st.write(st.session_state["failed_files"])
-                                        # download
-                                        csv = pd.DataFrame(st.session_state["failed_files"], columns=["file_name"])
-
-                                        b64 = base64.b64encode(csv.to_csv(index=False).encode()).decode()
-                                        href = f'<a href="data:file/csv;base64,{b64}" download="failed_files.csv">Download failed files</a>'
-                                        st.markdown(href, unsafe_allow_html=True)
-                                else:
-                                    st.error("An error occured while uploading the files")
+                                st.error("An error occured while uploading the files")
 
 
 app()

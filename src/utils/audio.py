@@ -132,6 +132,8 @@ def normalize_audio(path, out_path):
         normalized_sound = sound - (sound.max_dBFS + 3.5)
     elif sound.max_dBFS < -6:
         normalized_sound = sound + (-5.5 - sound.max_dBFS)
+    else:
+        normalized_sound = sound
     normalized_sound.export(out_path, format="wav")
     return out_path
 

@@ -52,7 +52,7 @@ def postprocess(session_, sample, language):
     sample.wer = round(float(utils.calculate_wer(sample.original_text, sample.asr_text)), 2)
     out_path = trim_audio(sample.local_path, sample.trim_start, sample.trim_end, sample.local_path.replace("raw", "trimmed"))
     # update sample
-    object_key = out_path.split(f"{str(paths.LOCAL_BUCKET_DIR)}")[1]
+    object_key = out_path.split(f"{str(paths.LOCAL_BUCKET_DIR)}/")[1]
     s3TrimmedPath = f"s3://{bucket_name}/{object_key}"
 
     sample.local_trimmed_path = out_path

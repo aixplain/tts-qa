@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
 
 import boto3
@@ -24,6 +25,18 @@ app_logger = root_logger.getChild("db_utils")
 s3_bucket_name = os.environ.get("S3_BUCKET_NAME")
 s3_dataset_dir = os.environ.get("S3_DATASET_DIR")
 
+
+# get engine from url
+POSTGRES_URL = os.getenv("POSTGRES_URL")
+
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+
+engine = create_engine(POSTGRES_URL)
+Session = sessionmaker(bind=engine)
+session = Session()
 
 ########################
 ###$ DATASET UTILS #####
@@ -422,6 +435,51 @@ def query_next_sample(dataset_id: int) -> List[Sample]:
     return samples[0]  # return the first sample
 
 
+def upload_file(session_, row, dataset_id, filename, s3, bucket_name):
+    # make sure that db is closed
+
+    meta = evaluate_audio(row["local_path"])
+    local_path = os.path.join(str(paths.LOCAL_BUCKET_DIR.resolve()), row["s3RawPath"])
+    # copy the file to the temp directory
+    shutil.copy(row["local_path"], local_path)
+    if meta["is_88khz"] == False:
+        convert_to_88k(row["local_path"], local_path)
+
+    if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
+        normalize_audio(local_path, local_path)
+
+    meta = evaluate_audio(local_path)
+
+    sample = Sample(
+        dataset_id=dataset_id,
+        filename=filename,
+        local_path=local_path,
+        s3RawPath=f"s3://{bucket_name}/{row['s3RawPath']}",
+        s3TrimmedPath=None,
+        original_text=row["text"],
+        asr_text=None,
+        duration=meta["duration"],
+        trim_start=None,
+        trim_end=None,
+        trimmed_audio_duration=None,
+        sentence_type=row["sentence_type"],
+        sentence_length=row["sentence_length"],
+        sampling_rate=meta["sampling_rate"],
+        sample_format=meta["sample_format"],
+        isPCM=meta["isPCM"],
+        n_channel=meta["n_channel"],
+        format=meta["format"],
+        peak_volume_db=meta["peak_volume_db"],
+        size=meta["size"],
+        isValid=meta["isValid"],
+        wer=None,
+    )
+
+    session_.add(sample)
+    s3.upload_file(row["local_path"], bucket_name, row["s3RawPath"])
+    session_.commit()
+
+
 async def upload_wav_samples(dataset_id: int, csv_path: str) -> Tuple[List[str], int]:
 
     # get dataset
@@ -438,59 +496,24 @@ async def upload_wav_samples(dataset_id: int, csv_path: str) -> Tuple[List[str],
     s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"))
 
     # Check if the dataset already exists
-    dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+    dataset = session.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
         raise ValueError(f"Dataset {dataset_id} does not exist")
     failed = []
     # get_metadata of each sample using evaluate_audio method that return dict
     for i, row in tqdm(df.iterrows(), total=len(df)):
         try:
-            # make sure that db is closed
-            db.session.close()
-            with db.session.begin():
-                meta = evaluate_audio(row["local_path"])
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    filename = os.path.basename(row["local_path"])
-                    # pdb.set_trace()
-                    local_path = os.path.join(str(paths.LOCAL_BUCKET_DIR.resolve()), row["s3RawPath"])
-                    # copy the file to the temp directory
-                    shutil.copy(row["local_path"], local_path)
-                    if meta["is_88khz"] == False:
-                        convert_to_88k(row["local_path"], local_path)
+            filename = os.path.basename(row["local_path"])
+            # if there is file in the database with the same name and dataset id then skip it
+            sample = session.query(Sample).filter(Sample.filename == filename).filter(Sample.dataset_id == dataset_id).first()
+            if sample:
+                app_logger.debug(f"POSTGRES: Sample {filename} already exists in dataset {dataset_id}")
+                continue
+            # run with thread pool
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                future = executor.submit(upload_file, session, row, dataset_id, filename, s3, bucket_name)
+                future.result()
 
-                    if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
-                        normalize_audio(local_path, local_path)
-
-                    meta = evaluate_audio(local_path)
-
-                    sample = Sample(
-                        dataset_id=dataset_id,
-                        filename=filename,
-                        local_path=local_path,
-                        s3RawPath=f"s3://{bucket_name}/{row['s3RawPath']}",
-                        s3TrimmedPath=None,
-                        original_text=row["text"],
-                        asr_text=None,
-                        duration=meta["duration"],
-                        trim_start=None,
-                        trim_end=None,
-                        trimmed_audio_duration=None,
-                        sentence_type=row["sentence_type"],
-                        sentence_length=row["sentence_length"],
-                        sampling_rate=meta["sampling_rate"],
-                        sample_format=meta["sample_format"],
-                        isPCM=meta["isPCM"],
-                        n_channel=meta["n_channel"],
-                        format=meta["format"],
-                        peak_volume_db=meta["peak_volume_db"],
-                        size=meta["size"],
-                        isValid=meta["isValid"],
-                        wer=None,
-                    )
-
-                    db.session.add(sample)
-                    s3.upload_file(row["local_path"], bucket_name, row["s3RawPath"])
-                    db.session.commit()
         except Exception as e:
             app_logger.error(f"POSTGRES: Error uploading sample {row['file_name']}: {e}")
             failed.append(row["file_name"])
