@@ -47,6 +47,10 @@ def app():
         st.session_state.csv_name = None
 
     st.title("Record Audio")
+    with st.sidebar:
+        if st.session_state["authentication_status"]:
+            st.write(f'Welcome *{st.session_state["name"]}*')
+
     # show a sample csv
     csv = sample_df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()
