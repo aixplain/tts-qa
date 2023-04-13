@@ -1,8 +1,8 @@
 import enum
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, func, Integer, MetaData, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, func, Integer, MetaData, String, Table, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 
 
 Base = declarative_base(metadata=MetaData())
@@ -14,13 +14,25 @@ class Status(enum.Enum):
     NotReviewed = "NotReviewed"
 
 
+annotator_dataset = Table(
+    "annotator_dataset",
+    Base.metadata,
+    Column("annotator_id", Integer, ForeignKey("annotator.id"), nullable=True),
+    Column("dataset_id", Integer, ForeignKey("dataset.id"), nullable=True),
+)
+
+
 # Define a Annotator model in qhich we will store the annotators's username and email address
 class Annotator(Base):  # type: ignore
     __tablename__ = "annotator"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False)
+    name = Column(String(50), unique=False, nullable=False)
     email = Column(String(120), unique=True, nullable=False)
-    annotations = relationship("Annotation", backref="annotator")
+    hashed_password = Column(String(120), unique=False, nullable=False)
+    ispreauthorized = Column(Boolean, default=True)
+    # defines
+    datasets = relationship("Dataset", secondary=annotator_dataset, backref=backref("assigned_annotators", passive_deletes=True))
 
     # add unique constraint to username and email
     __table_args__ = (UniqueConstraint("username", "email", name="_username_email_uc"),)
@@ -29,7 +41,14 @@ class Annotator(Base):  # type: ignore
         return f"{self.to_dict()}"
 
     def to_dict(self):
-        return {"id": self.id, "username": self.username, "email": self.email}
+        return {
+            "id": self.id,
+            "username": self.username,
+            "name": self.name,
+            "email": self.email,
+            "hashed_password": "********",
+            "ispreauthorized": self.ispreauthorized,
+        }
 
 
 # Define a Sample model in which we will store following nformation for an tts recording sample:
@@ -114,7 +133,7 @@ class Sample(Base):  # type: ignore
 class Annotation(Base):  # type: ignore
     __tablename__ = "annotation"
     id = Column(Integer, primary_key=True)
-    annotator_id = Column(Integer, ForeignKey("annotator.id"), nullable=False)
+    annotator_id = Column(Integer, ForeignKey("annotator.id"), nullable=True)
     sample_id = Column(Integer, ForeignKey("sample.id"), nullable=False)
     created_at = Column(DateTime, default=func.now())
     status = Column(Enum(Status), default=Status.NotReviewed)
@@ -127,6 +146,9 @@ class Annotation(Base):  # type: ignore
     isSpeedRight = Column(Boolean, default=None, nullable=True)
     isConsisent = Column(Boolean, default=None, nullable=True)
     feedback = Column(String(250), unique=False, nullable=True)
+
+    annotator = relationship("Annotator", backref=backref("annotations", passive_deletes=True))
+
     __table_args__ = (UniqueConstraint("annotator_id", "sample_id", name="_annotator_sample_uc"),)
 
     def __repr__(self):
@@ -162,6 +184,8 @@ class Dataset(Base):  # type: ignore
     description = Column(String(250), unique=False, nullable=True)
     created_at = Column(DateTime, default=func.now())
     samples = relationship("Sample", cascade="all, delete", backref="dataset")
+
+    annotators = relationship("Annotator", secondary=annotator_dataset, backref=backref("assigned_datasets", passive_deletes=True))
 
     __table_args__ = (UniqueConstraint("name", name="_name_uc"),)
 

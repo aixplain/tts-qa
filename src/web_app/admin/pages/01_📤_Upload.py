@@ -39,6 +39,10 @@ BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.ge
 
 def app():
 
+    with st.sidebar:
+        if st.session_state["authentication_status"]:
+            st.write(f'Welcome *{st.session_state["name"]}*')
+
     sample_df = pd.read_csv(os.path.join(BASE_DIR, "src", "web_app", "admin", "data", "sample_csv.csv"))
     sample_zip_path = os.path.join(BASE_DIR, "src", "web_app", "admin", "data", "sample_zip.zip")
 

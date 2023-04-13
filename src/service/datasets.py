@@ -4,7 +4,7 @@ from typing import List, Union
 from fastapi import APIRouter
 
 from src.logger import root_logger
-from src.service.bases import DatasetModel, InfoModel, SampleModel  # noqa: F401
+from src.service.bases import AnnotatorModel, DatasetModel, InfoModel, SampleModel  # noqa: F401
 from src.utils import db_utils
 
 
@@ -79,6 +79,16 @@ def insert_sample(id: int, text: str, audio_path: str, sentence_length: int = No
     try:
         sample = db_utils.insert_sample(id, text, audio_path, sentence_type, sentence_length)
         return SampleModel(**sample.to_dict())
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
+# get annotators allowed to annotate this dataset
+@router.get("/{id}/annotators")
+def get_annotators_of_dataset(id: int) -> Union[List[AnnotatorModel], InfoModel]:
+    try:
+        annotators = db_utils.get_annotators_of_dataset(id)
+        return [AnnotatorModel(**annotator.to_dict()) for annotator in annotators]
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
 

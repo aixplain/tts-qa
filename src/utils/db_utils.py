@@ -6,10 +6,13 @@ from typing import List, Tuple
 
 import boto3
 import pandas as pd
+import streamlit_authenticator as stauth
+import yaml
 from dotenv import load_dotenv
 from fastapi_sqlalchemy import db
 from sqlalchemy import not_
 from tqdm import tqdm
+from yaml.loader import SafeLoader
 
 from src.logger import root_logger
 from src.paths import paths
@@ -37,6 +40,19 @@ from sqlalchemy.orm import sessionmaker
 engine = create_engine(POSTGRES_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
+
+
+def generate_password_hash(password: str) -> str:
+    """Generate a password hash.
+
+    Args:
+        password (str): The password to hash.
+
+    Returns:
+        str: The password hash.
+    """
+    return stauth.Hasher([password]).generate()[0]
+
 
 ########################
 ###$ DATASET UTILS #####
@@ -104,7 +120,7 @@ def delete_dataset(id: int) -> None:
         dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
         if not dataset:
             raise ValueError(f"Dataset {id} does not exist")
-
+        dataset.annotators = []
         dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
         db.session.delete(dataset)
         db.session.commit()
@@ -157,6 +173,26 @@ def update_dataset(id: int, **kwargs) -> None:
         db.session.commit()
 
 
+def get_annotators_of_dataset(id: int) -> List[Annotator]:
+    """Get the annotators of a dataset.
+
+    Args:
+        id (int): The dataset id.
+
+    Returns:
+        List[Annotator]: The list of annotators.
+    """
+    app_logger.debug(f"POSTGRES: Getting annotators of dataset {id}")
+    with db.session.begin():
+        # check if the dataset exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {id} does not exist")
+        annotators = dataset.annotators
+        db.session.commit()
+    return annotators
+
+
 ########################
 #### ANNOTATOR UTILS ###
 ########################
@@ -176,7 +212,7 @@ def list_annotators() -> List[Annotator]:
     return annotators
 
 
-def create_annotator(username: str, email: str) -> Annotator:
+def create_annotator(username: str, name: str, email: str, password: str, ispreauthorized: bool = True) -> Annotator:
     """Create an annotator in the database.
 
     Args:
@@ -193,10 +229,53 @@ def create_annotator(username: str, email: str) -> Annotator:
         if annotator:
             raise ValueError(f"Annotator {username} already exists")
 
-        annotator = Annotator(username=username, email=email)
-        db.session.add(annotator)
-        db.session.commit()
+        annotator = Annotator(username=username, name=name, email=email, hashed_password=generate_password_hash(password), ispreauthorized=ispreauthorized)
+        yaml_path = paths.LOGIN_CONFIG_PATH
 
+        if not yaml_path.exists():
+            app_logger.info("Creating login config file")
+            yaml_path.parent.mkdir(parents=True, exist_ok=True)
+            yaml_path.touch()
+
+            config = {
+                "credentials": {"usernames": {}},
+                "cookie": {"expiry_days": 0, "key": "some_signature_key", "name": "some_cookie_name"},
+                "preauthorized": {"emails": []},
+            }
+            with open(yaml_path, "w") as file:
+                yaml.dump(config, file, default_flow_style=False)
+
+        with open(yaml_path) as file:
+            config = yaml.load(file, Loader=SafeLoader)
+
+        # add  the annotator to the login config
+
+        config["credentials"]["usernames"][username] = {  # type: ignore
+            "email": annotator.email,
+            "name": annotator.name,
+            "password": annotator.hashed_password,
+        }
+
+        if annotator.ispreauthorized:
+            config["preauthorized"]["emails"].append(annotator.email)  # type: ignore
+
+        with open(yaml_path, "w") as file:
+            yaml.dump(config, file)
+
+        # try to commit the annotator to the database if it fails, delete the annotator from the login config
+        try:
+            db.session.add(annotator)
+            db.session.commit()
+        except Exception as e:
+            app_logger.error(f"POSTGRES: Failed to create annotator {username}")
+            app_logger.error(e)
+            # delete the annotator from the login config
+            del config["credentials"]["usernames"][username]  # type: ignore
+            if annotator.ispreauthorized:
+                config["preauthorized"]["emails"].remove(annotator.email)  # type: ignore
+            with open(yaml_path, "w") as file:
+                yaml.dump(config, file, default_flow_style=False)
+            raise e
     return annotator
 
 
@@ -212,9 +291,28 @@ def delete_annotator(id: int) -> None:
         annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
         if not annotator:
             raise ValueError(f"Annotator {id} does not exist")
+        annotator.datasets = []
 
-        db.session.query(Annotator).filter(Annotator.id == id).delete()
-        db.session.commit()
+        with open(paths.LOGIN_CONFIG_PATH) as file:
+            config = yaml.load(file, Loader=SafeLoader)
+
+        config_copy = config.copy()
+        # delete the annotator from the login config
+        del config["credentials"]["usernames"][annotator.username]
+        if annotator.ispreauthorized:
+            config["preauthorized"]["emails"].remove(annotator.email)
+        with open(paths.LOGIN_CONFIG_PATH, "w") as file:
+            yaml.dump(config, file, default_flow_style=False)
+        try:
+            db.session.query(Annotator).filter(Annotator.id == id).delete()
+            db.session.commit()
+        except Exception as e:
+            app_logger.error(f"POSTGRES: Failed to delete annotator {id}")
+            app_logger.error(e)
+            # restore the annotator in the login config
+            with open(paths.LOGIN_CONFIG_PATH, "w") as file:
+                yaml.dump(config_copy, file, default_flow_style=False)
+            raise e
 
 
 def get_annotator_by_id(id: int) -> Annotator:
@@ -236,6 +334,54 @@ def get_annotator_by_id(id: int) -> Annotator:
         annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
         db.session.commit()
     return annotator
+
+
+def assign_dataset_to_annotator(annotator_id: int, dataset_id: int) -> None:
+    """Assign a dataset to an annotator.
+
+    Args:
+        dataset_id (int): The dataset id to assign.
+        annotator_id (int): The annotator id to assign.
+    """
+    app_logger.debug(f"POSTGRES: Assigning dataset {dataset_id} to annotator {annotator_id}")
+    with db.session.begin():
+        # check if the dataset exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+
+        # check if the annotator exists
+        annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
+        if not annotator:
+            raise ValueError(f"Annotator {annotator_id} does not exist")
+
+        # check if the annotator already has the dataset assigned
+        if dataset in annotator.datasets:
+            raise ValueError(f"Annotator {annotator_id} already has dataset {dataset_id} assigned")
+
+        annotator.datasets.append(dataset)
+        db.session.commit()
+
+
+def get_datasets_of_annotator(annotator_id: int) -> List[Dataset]:
+    """Get the datasets of an annotator.
+
+    Args:
+        annotator_id (int): The annotator id to get the datasets from.
+
+    Returns:
+        List[Dataset]: The datasets of the annotator.
+    """
+    app_logger.debug(f"POSTGRES: Getting datasets of annotator {annotator_id}")
+    with db.session.begin():
+        # check if the annotator exists
+        annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
+        if not annotator:
+            raise ValueError(f"Annotator {annotator_id} does not exist")
+
+        datasets = annotator.datasets
+        db.session.commit()
+    return datasets
 
 
 def update_annotator(id: int, **kwargs) -> None:

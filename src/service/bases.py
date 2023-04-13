@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel, Field
 from pydantic_sqlalchemy import sqlalchemy_to_pydantic
 
@@ -39,7 +41,7 @@ class InfoModel(BaseModel):
 
     message: str = Field(..., description="The error message")
     # error field might be empty or contain the error message
-    error: str = Field(None, description="The error message")
+    error: Optional[str] = Field(default=None, description="The error message")
 
     class Config:
         schema_extra = {

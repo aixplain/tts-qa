@@ -29,6 +29,9 @@ class Paths:
     PIPELINE_PATH: Path = MODELS_DIR / "pipeline.pkl"
     BEST_MODEL_PATH: Path = MODELS_DIR / "model_best.pkl"
 
+    CONFIGS_DIR: Path = PROJECT_ROOT_DIR / "configs"
+    LOGIN_CONFIG_PATH: Path = CONFIGS_DIR / "login_config.yaml"
+
     OUTPUT_DIR_PATTERN: str = f"{OUTPUTS_DIR}/" + "{run_type}/{model_name}/{run_tag}/" + now_str
 
 

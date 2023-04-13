@@ -22,6 +22,7 @@ backend/xview2/
 **/weights/
 
 alembic/versions/
+configs/login_config.yaml
 # ignore only root data
 /data
 **/manifest_vad_input.json

@@ -3,7 +3,7 @@ from typing import List, Union
 from fastapi import APIRouter
 
 from src.logger import root_logger
-from src.service.bases import AnnotatorModel, InfoModel, SampleModel  # noqa: F401
+from src.service.bases import AnnotatorModel, DatasetModel, InfoModel, SampleModel  # noqa: F401
 from src.utils import db_utils
 
 
@@ -22,9 +22,9 @@ def list_annotators() -> List[AnnotatorModel]:
 
 # create an annotator
 @router.post("/{username}")
-def create_annotator(username: str, email: str) -> Union[AnnotatorModel, InfoModel]:
+def create_annotator(username: str, name: str, email: str, password: str, ispreauthorized: bool = True) -> Union[AnnotatorModel, InfoModel]:
     try:
-        annotator = db_utils.create_annotator(username=username, email=email)
+        annotator = db_utils.create_annotator(username=username, name=name, email=email, password=password, ispreauthorized=ispreauthorized)
         return AnnotatorModel(**annotator.to_dict())
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
@@ -50,13 +50,33 @@ def delete_annotator(id: int) -> Union[AnnotatorModel, InfoModel]:
         return InfoModel(**{"message": "Failed", "error": str(e)})
 
 
-# update an annotator
-@router.put("/{id}")
-def update_annotator(id: int, username: str, email: str) -> Union[AnnotatorModel, InfoModel]:
+# assign dataset that the annotator permitted to annotate
+@router.post("/{id}/datasets/{dataset_id}")
+def assign_dataset_to_annotator(id: int, dataset_id: int) -> InfoModel:
     try:
-        annotator = {"username": username, "email": email}
-
-        annotator = db_utils.update_annotator(id, **annotator)  # type: ignore
-        return AnnotatorModel(**annotator.to_dict())  # type: ignore # noqa: F821
+        db_utils.assign_dataset_to_annotator(id, dataset_id)
+        return InfoModel(**{"message": "Success"})
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
+# get datasets that the annotator permitted to annotate
+@router.get("/{id}/datasets")
+def get_datasets_of_annotator(id: int) -> Union[List[DatasetModel], InfoModel]:
+    try:
+        datasets = db_utils.get_datasets_of_annotator(id)
+        return [DatasetModel(**dataset.to_dict()) for dataset in datasets]
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
+# # update an annotator
+# @router.put("/{id}")
+# def update_annotator(id: int, username: str, email: str) -> Union[AnnotatorModel, InfoModel]:
+#     try:
+#         annotator = {"username": username, "email": email }
+
+#         annotator = db_utils.update_annotator(id, **annotator)  # type: ignore
+#         return AnnotatorModel(**annotator.to_dict())  # type: ignore # noqa: F821
+#     except Exception as e:
+#         return InfoModel(**{"message": "Failed", "error": str(e)})

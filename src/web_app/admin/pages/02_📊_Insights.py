@@ -41,6 +41,10 @@ def app():
 
     st.title("TTS Datasets")
 
+    with st.sidebar:
+        if st.session_state["authentication_status"]:
+            st.write(f'Welcome *{st.session_state["name"]}*')
+
     def get_datasets():
         return requests.get(BACKEND_URL + "/datasets").json()
 
