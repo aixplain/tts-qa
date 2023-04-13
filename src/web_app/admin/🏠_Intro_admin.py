@@ -1,4 +1,5 @@
 import os
+import pdb
 import sys
 
 import streamlit as st
@@ -11,20 +12,26 @@ sys.path.append(os.path.join(current_file_path, "..", "..", "..", ".."))
 
 from src.logger import root_logger
 from src.paths import paths
-
+from dotenv import load_dotenv
 
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
+
+# load the .env file
+load_dotenv(os.path.join(BASE_DIR, "vars.env"))
+
 
 # set app name and icon
 st.set_page_config(page_title="aiXplain's TTS Data App", page_icon="🎙️", layout="wide")
 
 app_logger = root_logger.getChild("web_app::home")
+BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.get("SERVER_PORT"))
 
 import yaml
 from yaml.loader import SafeLoader
+import requests
 
 
-config_file_path = os.path.join(BASE_DIR, "data", "login_config.yaml")
+config_file_path = paths.LOGIN_CONFIG_PATH
 with open(config_file_path) as file:
     config = yaml.load(file, Loader=SafeLoader)
 
@@ -38,30 +45,85 @@ with st.sidebar:
     if st.session_state["authentication_status"]:
         authenticator.logout("Logout", "main")
         st.write(f'Welcome *{st.session_state["name"]}*')
-        if st.button("Reset password", key="my_reset"):
+        choice = st.selectbox("Select an option", ["Create User", "Assign Dataset", "Delete User"])
+        if choice == "Create User":
             try:
-                if authenticator.reset_password(username, "Reset password"):
-                    st.success("Password modified successfully")
-                    with open(config_file_path, "w") as file:
-                        yaml.dump(config, file, default_flow_style=False)
+                with st.form("Register user"):
+                    email = st.text_input("Email")
+                    username = st.text_input("Username")
+                    name = st.text_input("Name")
+                    isadmin = st.selectbox("Is admin?", ["False", "True"])
+                    password = st.text_input("Password", type="password")
+                    repeat_password = st.text_input("Repeat password", type="password")
+                    submit_button = st.form_submit_button("Add User")
+
+                if submit_button:
+                    if password == repeat_password:
+                        # create user
+                        params = {"password": password, "name": name, "email": email, "isadmin": isadmin, "ispreauthorized": True}
+                        response = requests.post(f"{BACKEND_URL}/annotators/{username}", params=params)
+                        if response.status_code == 200:
+                            response = response.json()
+                            if "message" in response:
+                                st.error(response["message"])
+                            else:
+                                st.success("User created successfully")
+
+                        else:
+                            st.error("Something went wrong")
+                    else:
+                        st.error("Passwords do not match")
             except Exception as e:
                 st.error(e)
-        if st.button("Register user", key="my_register"):
+        if choice == "Assign Dataset":
             try:
-                if authenticator.register_user("Register user", preauthorization=True):
-                    st.success("User registered successfully")
-                    with open(config_file_path, "w") as file:
-                        yaml.dump(config, file, default_flow_style=False)
+                all_datasets = requests.get(f"{BACKEND_URL}/datasets").json()
+                annotators = requests.get(f"{BACKEND_URL}/annotators").json()
+                annotator_selected = st.selectbox("To Annotator", [annotator["username"] for annotator in annotators])
+                with st.form("Assign dataset"):
+                    annotator_id = [annotator["id"] for annotator in annotators if annotator["username"] == annotator_selected][0]
+                    assigned_datasets = requests.get(f"{BACKEND_URL}/annotators/{annotator_id}/datasets").json()
+                    not_assigned_datasets = [dataset for dataset in all_datasets if dataset not in assigned_datasets]
+                    datasets_selected = st.multiselect("Dataset", [dataset["name"] for dataset in not_assigned_datasets])
+                    if len(not_assigned_datasets) == 0:
+                        st.warning("No datasets or all datasets are assigned to this annotator")
+                    submit_button = st.form_submit_button("Assign Dataset")
+
+                if submit_button:
+                    # assign dataset
+                    for dataset_selected in datasets_selected:
+                        dataset_id = [dataset["id"] for dataset in not_assigned_datasets if dataset["name"] == dataset_selected][0]
+                        response = requests.post(f"{BACKEND_URL}/annotators/{annotator_id}/datasets/{dataset_id}")
+                        if response.status_code == 200:
+                            response = response.json()
+                            if response["message"] == "Failed":
+                                st.error(response["error"])
+                            else:
+                                st.success(f"Dataset {dataset_selected} assigned to {annotator_selected}")
+                        else:
+                            st.error("Something went wrong")
             except Exception as e:
                 st.error(e)
-        if st.button("Update user details", key="my_update"):
+        if choice == "Delete User":
             try:
-                if authenticator.update_user_details(username, "Update user details"):
-                    st.success("Entries updated successfully")
-                    with open(config_file_path, "w") as file:
-                        yaml.dump(config, file, default_flow_style=False)
+                annotators = requests.get(f"{BACKEND_URL}/annotators").json()
+                with st.form("Delete user"):
+                    annotator_selected = st.selectbox("Annotator", [annotator["username"] for annotator in annotators])
+                    submit_button = st.form_submit_button("Delete User")
+                if submit_button:
+                    # delete user
+                    annotator_id = [annotator["id"] for annotator in annotators if annotator["username"] == annotator_selected][0]
+                    response = requests.delete(f"{BACKEND_URL}/annotators/{annotator_id}")
+                    if response.status_code == 200:
+                        response = response.json()
+                        if "message" in response and response["message"] != "Failed":
+                            st.error(response["error"])
+                        else:
+                            st.success(f"User {annotator_selected} deleted")
+                    else:
+                        st.error("Something went wrong")
             except Exception as e:
-                st.error(e)
+                st.error(f"Error: {e}")
 
     elif st.session_state["authentication_status"] is False:
         st.error("Username/password is incorrect")
@@ -97,7 +159,3 @@ each annotation, and any issues encountered during the QA process. Use these ins
 
 
 st.markdown(text)
-
-# make a sidebar
-st.sidebar.title("Navigation")
-st.sidebar.markdown("### Select a page to get started")

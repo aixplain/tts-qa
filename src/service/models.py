@@ -31,11 +31,15 @@ class Annotator(Base):  # type: ignore
     email = Column(String(120), unique=True, nullable=False)
     hashed_password = Column(String(120), unique=False, nullable=False)
     ispreauthorized = Column(Boolean, default=True)
+    isadmin = Column(Boolean, default=False)
     # defines
     datasets = relationship("Dataset", secondary=annotator_dataset, backref=backref("assigned_annotators", passive_deletes=True))
 
-    # add unique constraint to username and email
-    __table_args__ = (UniqueConstraint("username", "email", name="_username_email_uc"),)
+    # add unique constraint to username
+    __table_args__ = (
+        UniqueConstraint("username", name="_username_uc"),
+        UniqueConstraint("email", name="_email_uc"),
+    )
 
     def __repr__(self):
         return f"{self.to_dict()}"
@@ -48,6 +52,7 @@ class Annotator(Base):  # type: ignore
             "email": self.email,
             "hashed_password": "********",
             "ispreauthorized": self.ispreauthorized,
+            "isadmin": self.isadmin,
         }
 
 
@@ -83,7 +88,10 @@ class Sample(Base):  # type: ignore
 
     annotation = relationship("Annotation", cascade="all, delete-orphan", backref="sample")
     __table_args__ = (
-        UniqueConstraint("filename", "s3RawPath", "s3TrimmedPath", name="_filename_s3RawPath_uc"),
+        UniqueConstraint("s3TrimmedPath", name="_s3TrimmedPath_uc"),
+        UniqueConstraint("s3RawPath", name="_s3RawPath_uc"),
+        # dataset id and sample filename should be unique
+        UniqueConstraint("dataset_id", "filename", name="_dataset_id_filename_uc"),
     )  # Example for such cases combination of filename and s3RawPath should be unique
 
     def __repr__(self):

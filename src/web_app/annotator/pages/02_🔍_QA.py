@@ -1,4 +1,5 @@
 import os
+import pdb
 import sys
 
 import requests
@@ -44,11 +45,8 @@ def app():
         if st.session_state["authentication_status"]:
             st.write(f'Welcome *{st.session_state["name"]}*')
 
-    def get_datasets():
-        return requests.get(BACKEND_URL + "/datasets").json()
-
-    def get_annotators():
-        return requests.get(BACKEND_URL + "/annotators").json()
+    def get_datasets(annotator_id: int):
+        return requests.get(BACKEND_URL + "/annotators/{}/datasets".format(annotator_id)).json()
 
     st.markdown(
         """
@@ -104,24 +102,18 @@ def app():
         st.session_state["isFirstRun"] = True
 
     if "annotator_id" not in st.session_state:
-        st.session_state["annotator_id"] = None
+        annotator = requests.get(BACKEND_URL + f"/annotators/username/{st.session_state['username']}").json()
+        st.session_state["annotator_id"] = annotator["id"]
 
     if "dataset_id" not in st.session_state:
         st.session_state["dataset_id"] = None
-
-    if "prev_annotator_id" not in st.session_state:
-        st.session_state["prev_annotator_id"] = None
 
     if "prev_dataset_id" not in st.session_state:
         st.session_state["prev_dataset_id"] = None
 
     if "datasets" not in st.session_state:
-        datasets = get_datasets()
+        datasets = get_datasets(st.session_state["annotator_id"])
         st.session_state["datasets"] = datasets
-
-    if "annotators" not in st.session_state:
-        annotators = get_annotators()
-        st.session_state["annotators"] = annotators
 
     def annotate_sample(
         id: int,
@@ -244,26 +236,7 @@ def app():
         sentence_type = st.radio("Sentence Type", sentence_type_list, key=f"sentence_type", index=defult_idx, horizontal=True)
         st.session_state["user_input"]["final_sentence_type"] = sentence_type.lower()
 
-    st.session_state["prev_annotator_id"] = st.session_state["annotator_id"]
     st.session_state["prev_dataset_id"] = st.session_state["dataset_id"]
-    annotator_selected = st.sidebar.selectbox("Annotator", [a["username"] for a in st.session_state["annotators"]] + ["Create New"])
-    if annotator_selected == "Create New":
-        username = st.sidebar.text_input("Username")
-        email = st.sidebar.text_input("Email")
-        params = {
-            "email": email,
-        }
-        if st.sidebar.button("Create"):
-            response = requests.post(BACKEND_URL + f"/annotators/{username}", params=params)
-            if response.status_code == 200:
-                st.sidebar.success("Annotator created successfully")
-                # refresh app
-                st.session_state["annotators"] = get_annotators()
-                st.experimental_rerun()
-            else:
-                st.sidebar.error("Annotator creation failed")
-    else:
-        st.session_state["annotator_id"] = [a["id"] for a in st.session_state["annotators"] if a["username"] == annotator_selected][0]
 
     st.session_state["dataset_id"] = st.sidebar.selectbox(
         "Dataset ",
@@ -271,7 +244,7 @@ def app():
     )
     st.session_state["dataset_id"] = [d["id"] for d in st.session_state["datasets"] if d["name"] == st.session_state["dataset_id"]][0]
 
-    if st.session_state["prev_annotator_id"] != st.session_state["annotator_id"] or st.session_state["prev_dataset_id"] != st.session_state["dataset_id"]:
+    if st.session_state["prev_dataset_id"] != st.session_state["dataset_id"]:
         st.session_state["query_button"] = True
         st.session_state["annotate_button"] = False
         st.session_state["isFirstRun"] = True
@@ -282,7 +255,7 @@ def app():
     stats = None  # TODO: Get stats from server
     # progress_status.write(f"{stats['labeled']} Rated, {stats['unlabeled']} Remaining")
     # my_bar = progress_bar.progress(float(stats["labeled"] / stats["unlabeled"]))
-    if st.session_state["dataset_id"] is not None and st.session_state["annotator_id"] is not None:
+    if st.session_state["dataset_id"] is not None:
 
         if st.session_state["query_button"] and st.session_state["isFirstRun"]:
             st.balloons()

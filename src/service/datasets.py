@@ -20,7 +20,6 @@ def list_datasets() -> List[DatasetModel]:
     # map the datasets to the DatasetModel
     return [DatasetModel(**dataset.to_dict()) for dataset in datasets]
 
-
 # create a dataset
 @router.post("/{name}")
 def create_dataset(name: str, language: str, description: str = None) -> Union[DatasetModel, InfoModel]:

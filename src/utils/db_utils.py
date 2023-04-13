@@ -91,6 +91,12 @@ def create_dataset(name: str, language: str, description: str) -> Dataset:
 
         db.session.commit()
 
+    # this dataset to all annotators qho are admin
+    annotators = db.session.query(Annotator).filter(Annotator.isadmin == True).all()
+    for annotator in annotators:
+        annotator.datasets.append(dataset)
+    db.session.commit()
+
     return dataset
 
 
@@ -212,7 +218,7 @@ def list_annotators() -> List[Annotator]:
     return annotators
 
 
-def create_annotator(username: str, name: str, email: str, password: str, ispreauthorized: bool = True) -> Annotator:
+def create_annotator(username: str, name: str, email: str, password: str, ispreauthorized: bool = True, isadmin: bool = False) -> Annotator:
     """Create an annotator in the database.
 
     Args:
@@ -229,7 +235,9 @@ def create_annotator(username: str, name: str, email: str, password: str, isprea
         if annotator:
             raise ValueError(f"Annotator {username} already exists")
 
-        annotator = Annotator(username=username, name=name, email=email, hashed_password=generate_password_hash(password), ispreauthorized=ispreauthorized)
+        annotator = Annotator(
+            username=username, name=name, email=email, hashed_password=generate_password_hash(password), ispreauthorized=ispreauthorized, isadmin=isadmin
+        )
         yaml_path = paths.LOGIN_CONFIG_PATH
 
         if not yaml_path.exists():
@@ -257,7 +265,8 @@ def create_annotator(username: str, name: str, email: str, password: str, isprea
         }
 
         if annotator.ispreauthorized:
-            config["preauthorized"]["emails"].append(annotator.email)  # type: ignore
+            if annotator.email not in config["preauthorized"]["emails"]:
+                raise ValueError(f"Annotator {username} is not preauthorized")
 
         with open(yaml_path, "w") as file:
             yaml.dump(config, file)
@@ -265,14 +274,19 @@ def create_annotator(username: str, name: str, email: str, password: str, isprea
         # try to commit the annotator to the database if it fails, delete the annotator from the login config
         try:
             db.session.add(annotator)
-            db.session.commit()
+            if annotator.isadmin:
+                # assign all dataset to the admin
+                datasets = db.session.query(Dataset).all()
+                for dataset in datasets:
+                    annotator.datasets.append(dataset)
+                db.session.commit()
         except Exception as e:
             app_logger.error(f"POSTGRES: Failed to create annotator {username}")
             app_logger.error(e)
             # delete the annotator from the login config
             del config["credentials"]["usernames"][username]  # type: ignore
-            if annotator.ispreauthorized:
-                config["preauthorized"]["emails"].remove(annotator.email)  # type: ignore
+            # if annotator.ispreauthorized:
+            #     config["preauthorized"]["emails"].remove(annotator.email)  # type: ignore
             with open(yaml_path, "w") as file:
                 yaml.dump(config, file, default_flow_style=False)
             raise e
@@ -291,6 +305,8 @@ def delete_annotator(id: int) -> None:
         annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
         if not annotator:
             raise ValueError(f"Annotator {id} does not exist")
+        if annotator.isadmin:
+            raise ValueError("Cannot delete admin annotator")
         annotator.datasets = []
 
         with open(paths.LOGIN_CONFIG_PATH) as file:
@@ -336,7 +352,28 @@ def get_annotator_by_id(id: int) -> Annotator:
     return annotator
 
 
-def assign_dataset_to_annotator(annotator_id: int, dataset_id: int) -> None:
+def get_annotator_by_username(username: str) -> Annotator:
+    """Get an annotator by username.
+
+    Args:
+        username (str): The annotator username to get.
+
+    Returns:
+        Annotator: The annotator.
+    """
+    app_logger.debug(f"POSTGRES: Getting annotator {username}")
+    with db.session.begin():
+        # check if the annotator exists
+        annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
+        if not annotator:
+            raise ValueError(f"Annotator {username} does not exist")
+
+        annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
+        db.session.commit()
+    return annotator
+
+
+def assign_annotator_to_dataset(annotator_id: int, dataset_id: int) -> None:
     """Assign a dataset to an annotator.
 
     Args:

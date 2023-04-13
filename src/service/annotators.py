@@ -1,3 +1,4 @@
+import pdb
 from typing import List, Union
 
 from fastapi import APIRouter
@@ -22,9 +23,11 @@ def list_annotators() -> List[AnnotatorModel]:
 
 # create an annotator
 @router.post("/{username}")
-def create_annotator(username: str, name: str, email: str, password: str, ispreauthorized: bool = True) -> Union[AnnotatorModel, InfoModel]:
+def create_annotator(
+    username: str, name: str, email: str, password: str, ispreauthorized: bool = True, isadmin: bool = False
+) -> Union[AnnotatorModel, InfoModel]:
     try:
-        annotator = db_utils.create_annotator(username=username, name=name, email=email, password=password, ispreauthorized=ispreauthorized)
+        annotator = db_utils.create_annotator(username=username, name=name, email=email, password=password, ispreauthorized=ispreauthorized, isadmin=isadmin)
         return AnnotatorModel(**annotator.to_dict())
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
@@ -35,6 +38,16 @@ def create_annotator(username: str, name: str, email: str, password: str, isprea
 def get_annotator_by_id(id: int) -> Union[AnnotatorModel, InfoModel]:
     try:
         annotator = db_utils.get_annotator_by_id(id)
+        return AnnotatorModel(**annotator.to_dict())
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
+# get annotator
+@router.get("/username/{username}")
+def get_annotator_by_username(username: str) -> Union[AnnotatorModel, InfoModel]:
+    try:
+        annotator = db_utils.get_annotator_by_username(username)
         return AnnotatorModel(**annotator.to_dict())
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
@@ -52,9 +65,9 @@ def delete_annotator(id: int) -> Union[AnnotatorModel, InfoModel]:
 
 # assign dataset that the annotator permitted to annotate
 @router.post("/{id}/datasets/{dataset_id}")
-def assign_dataset_to_annotator(id: int, dataset_id: int) -> InfoModel:
+def assign_annotator_to_dataset(id: int, dataset_id: int) -> InfoModel:
     try:
-        db_utils.assign_dataset_to_annotator(id, dataset_id)
+        db_utils.assign_annotator_to_dataset(id, dataset_id)
         return InfoModel(**{"message": "Success"})
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
