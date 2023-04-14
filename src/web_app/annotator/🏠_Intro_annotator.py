@@ -25,6 +25,8 @@ config_file_path = paths.LOGIN_CONFIG_PATH
 with open(config_file_path) as file:
     config = yaml.load(file, Loader=SafeLoader)
 
+st.set_page_config(page_title="aiXplain's TTS QA App", page_icon="🔍", layout="wide")
+
 authenticator = stauth.Authenticate(
     config["credentials"], config["cookie"]["name"], config["cookie"]["key"], config["cookie"]["expiry_days"], config["preauthorized"]
 )

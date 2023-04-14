@@ -10,6 +10,8 @@ services:
       PGDATA: /data/postgres
     ports:
       - "5432:5432"
+    volumes:
+      - ./data/postgres:/data/postgres
 
 networks:
   default:

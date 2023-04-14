@@ -152,3 +152,10 @@ def convert_to_mono(path, out_path):
     mono_sound = sound.set_channels(1)
     mono_sound.export(out_path, format="wav")
     return out_path
+
+
+def convert_to_s16le(path, out_path):
+    sound = AudioSegment.from_file(path, format="wav")
+    s16le_sound = sound.set_sample_width(2)
+    s16le_sound.export(out_path, format="wav")
+    return out_path

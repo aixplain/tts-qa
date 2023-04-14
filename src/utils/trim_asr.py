@@ -72,7 +72,18 @@ def process_datasets():
         samples = (
             session.query(Sample)
             .filter(Sample.dataset_id == dataset.id)
-            .filter((Sample.local_trimmed_path == None) | (Sample.local_path == None) | (Sample.s3TrimmedPath == None) | (Sample.s3RawPath == None))
+            .filter(
+                (Sample.local_trimmed_path == None)
+                | (Sample.local_path == None)
+                | (Sample.s3TrimmedPath == None)
+                | (Sample.s3RawPath == None)
+                | (Sample.asr_text == None)
+                | (Sample.trim_start == None)
+                | (Sample.trim_end == None)
+                | (Sample.trimmed_audio_duration == None)
+                | (Sample.longest_pause == None)
+                | (Sample.wer == None)
+            )
             .all()
         )
         while len(samples) > 0:
@@ -88,7 +99,18 @@ def process_datasets():
             samples = (
                 session.query(Sample)
                 .filter(Sample.dataset_id == dataset.id)
-                .filter((Sample.local_trimmed_path == None) | (Sample.local_path == None) | (Sample.s3TrimmedPath == None) | (Sample.s3RawPath == None))
+                .filter(
+                    (Sample.local_trimmed_path == None)
+                    | (Sample.local_path == None)
+                    | (Sample.s3TrimmedPath == None)
+                    | (Sample.s3RawPath == None)
+                    | (Sample.asr_text == None)
+                    | (Sample.trim_start == None)
+                    | (Sample.trim_end == None)
+                    | (Sample.trimmed_audio_duration == None)
+                    | (Sample.longest_pause == None)
+                    | (Sample.wer == None)
+                )
                 .all()
             )
 

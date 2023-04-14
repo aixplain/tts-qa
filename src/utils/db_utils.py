@@ -17,7 +17,7 @@ from yaml.loader import SafeLoader
 from src.logger import root_logger
 from src.paths import paths
 from src.service.models import Annotation, Annotator, Dataset, Sample, Status  # noqa: F401
-from src.utils.audio import convert_to_88k, convert_to_mono, evaluate_audio, normalize_audio, trim_audio  # noqa: F401
+from src.utils.audio import convert_to_88k, convert_to_mono, convert_to_s16le, evaluate_audio, normalize_audio, trim_audio  # noqa: F401
 
 
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
@@ -265,7 +265,7 @@ def create_annotator(username: str, name: str, email: str, password: str, isprea
         }
 
         if annotator.ispreauthorized:
-            if annotator.email not in config["preauthorized"]["emails"]:
+            if annotator.email not in config["preauthorized"]["emails"]:  # type: ignore
                 raise ValueError(f"Annotator {username} is not preauthorized")
 
         with open(yaml_path, "w") as file:
@@ -631,6 +631,9 @@ def upload_file(session_, row, dataset_id, filename, s3, bucket_name):
     if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
         normalize_audio(local_path, local_path)
 
+    if meta["isPCM"] == False:
+        convert_to_s16le(local_path, local_path)
+
     meta = evaluate_audio(local_path)
 
     sample = Sample(
@@ -752,6 +755,9 @@ def insert_sample(
 
             if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
                 normalize_audio(local_path, local_path)
+
+            if meta["isPCM"] == False:
+                convert_to_s16le(local_path, local_path)
 
             meta = evaluate_audio(local_path)
 
