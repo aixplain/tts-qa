@@ -1,17 +1,16 @@
 version: '3.5'
 
 services:
-  postgres:
-    container_name: postgres_container
+  db:
+    container_name: postgres_container_dev
     image: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PWD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-dev_tts_db}
       PGDATA: /data/postgres
     ports:
       - "5432:5432"
-    volumes:
-      - ./data/postgres:/data/postgres
 
 networks:
   default:

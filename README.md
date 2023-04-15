@@ -23,6 +23,6 @@ python -m streamlit run ./src/web_app/admin/🏠_Intro_admin.py  --server.maxUpl
 ```bash
 docker exec -t your-db-container pg_dumpall -c -U postgres > dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
 
-cat your_dump.sql | docker exec -i your-db-container psql -U postgres
+cat dump_14-04-2023_19_51_42.sql | docker exec -i postgres_container_dev  psql -U postgres dev_tts_db
 
 ```

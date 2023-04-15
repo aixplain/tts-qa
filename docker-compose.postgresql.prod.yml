@@ -1,0 +1,17 @@
+version: '3.5'
+
+services:
+  db:
+    container_name: postgres_container_prod
+    image: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PWD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-prod_tts_db}
+      PGDATA: /data/postgres
+    ports:
+      - "5432:5432"
+
+networks:
+  default:
+    name: tts_network
