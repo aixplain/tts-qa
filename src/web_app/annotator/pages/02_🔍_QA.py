@@ -1,5 +1,4 @@
 import os
-import pdb
 import sys
 
 import requests
@@ -46,7 +45,7 @@ def app():
             st.write(f'Welcome *{st.session_state["name"]}*')
 
     def get_datasets(annotator_id: int):
-        return requests.get(BACKEND_URL + "/annotators/{}/datasets".format(annotator_id)).json()
+        return requests.get(BACKEND_URL + f"/annotators/{annotator_id}/datasets").json()
 
     st.markdown(
         """
@@ -115,6 +114,13 @@ def app():
         datasets = get_datasets(st.session_state["annotator_id"])
         st.session_state["datasets"] = datasets
 
+    if "stats" not in st.session_state:
+        st.session_state["stats"] = {
+            "total": 0,
+            "annotated": 0,
+            "not_annotated": 0,
+        }
+
     def annotate_sample(
         id: int,
         annotator_id: int,
@@ -162,8 +168,11 @@ def app():
             # send a request to get next sample
             response = requests.get(BACKEND_URL + f"/datasets/{st.session_state['dataset_id']}/next_sample")
             if response.status_code == 200:
-                sample = response.json()
+                response = response.json()
+                sample = response["sample"]
+                stats = response["stats"]
                 st.session_state["sample"] = sample
+                st.session_state["stats"] = stats
                 st.session_state["user_input"] = {
                     "final_text": sample["final_text"],
                     "final_sentence_type": sample["sentence_type"],
@@ -265,9 +274,17 @@ def app():
             query()
             st.session_state["query_button"] = False
             st.session_state["annotate_button"] = False
+        # add progresss bar
+        progress_bar = st.progress(0, text="Progress")
+        progress = st.session_state["stats"]["annotated"] / st.session_state["stats"]["total"]
+        progress_bar.progress(
+            progress,
+            text=f"Progress: {st.session_state['stats']['annotated']} Rated, {st.session_state['stats']['total'] - st.session_state['stats']['annotated']} Remaining",
+        )
 
         if not st.session_state["isFirstRun"]:
             if "message" not in st.session_state["sample"]:
+
                 # Input sentence
                 sample_container(st.session_state["sample"])
 

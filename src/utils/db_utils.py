@@ -11,6 +11,7 @@ import yaml
 from dotenv import load_dotenv
 from fastapi_sqlalchemy import db
 from sqlalchemy import not_
+from sqlalchemy.sql.expression import func
 from tqdm import tqdm
 from yaml.loader import SafeLoader
 
@@ -575,7 +576,7 @@ def annotate_sample(
         db.session.commit()
 
 
-def query_next_sample(dataset_id: int) -> List[Sample]:
+def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
     """List all the samples in the database.
 
     Args:
@@ -592,11 +593,14 @@ def query_next_sample(dataset_id: int) -> List[Sample]:
         if not dataset:
             raise ValueError(f"Dataset {dataset_id} does not exist")
 
-        # join samples and annotations to get the next sample
+        # join samples and annotations to get the next sample where wer>0.2
+        # the difference in  lenght of asr_tex and original text should be more than 5 percent of the original text
         all = (
             db.session.query(Sample, Annotation)
             .outerjoin(Annotation, Sample.id == Annotation.sample_id)
             .filter(Sample.dataset_id == dataset_id)
+            .filter(Sample.wer > 0.2)
+            .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.05 * func.length(Sample.original_text))
             .filter(
                 not_(
                     (Sample.local_trimmed_path == None)
@@ -613,9 +617,15 @@ def query_next_sample(dataset_id: int) -> List[Sample]:
         # filter out the samples that have been annotated
         samples = [sample for sample, annotation in all if annotation is None]
 
+        # number of samples that have been annotated
+        annotated = len(all) - len(samples)
+
+        # number of samples that have not been annotated
+        not_annotated = len(samples)
+
     if len(samples) == 0:
-        return None
-    return samples[0]  # return the first sample
+        return None, {"annotated": annotated, "not_annotated": not_annotated, "total": annotated + not_annotated}
+    return samples[0], {"annotated": annotated, "not_annotated": not_annotated, "total": annotated + not_annotated}
 
 
 def upload_file(session_, row, dataset_id, filename, s3, bucket_name):

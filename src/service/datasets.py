@@ -20,6 +20,7 @@ def list_datasets() -> List[DatasetModel]:
     # map the datasets to the DatasetModel
     return [DatasetModel(**dataset.to_dict()) for dataset in datasets]
 
+
 # create a dataset
 @router.post("/{name}")
 def create_dataset(name: str, language: str, description: str = None) -> Union[DatasetModel, InfoModel]:
@@ -94,14 +95,14 @@ def get_annotators_of_dataset(id: int) -> Union[List[AnnotatorModel], InfoModel]
 
 # query next sample
 @router.get("/{id}/next_sample")
-def query_next_sample(id: int) -> Union[SampleModel, InfoModel]:
+def query_next_sample(id: int) -> dict:
     try:
-        sample = db_utils.query_next_sample(id)
+        sample, stats = db_utils.query_next_sample(id)
         if sample is None:
-            return InfoModel(**{"message": "No more samples"})
-        return SampleModel(**sample.to_dict())  # type: ignore
+            return {"message": "No more samples"}
+        return {"sample": SampleModel(**sample.to_dict()), "stats": stats}  # type: ignore
     except Exception as e:
-        return InfoModel(**{"message": "Failed", "error": str(e)})
+        return {"message": "Failed", "error": str(e)}
 
 
 def handle_exceptions(task: asyncio.Task):
