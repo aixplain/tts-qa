@@ -28,6 +28,11 @@ SAVE_DIR_CSV = os.path.join(BASE_DIR, "src", "web_app", "annotator", "data", "cs
 
 
 def app():
+    if "authentication_status" not in st.session_state:
+        # forward to the page where the user can login
+        st.warning("Please login first")
+        st.stop()
+
     if not os.path.exists(SAVE_DIR_AUDIO):
         os.makedirs(SAVE_DIR_AUDIO)
 

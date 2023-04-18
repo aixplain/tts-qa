@@ -40,6 +40,10 @@ BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.ge
 def app():
 
     st.title("TTS Datasets")
+    if "authentication_status" not in st.session_state:
+        # forward to the page where the user can login
+        st.warning("Please login first")
+        st.stop()
 
     with st.sidebar:
         if st.session_state["authentication_status"]:

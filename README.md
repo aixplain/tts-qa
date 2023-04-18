@@ -21,8 +21,25 @@ python -m streamlit run ./src/web_app/admin/🏠_Intro_admin.py  --server.maxUpl
 ### How to dupp and restore the database
 
 ```bash
-docker exec -t your-db-container pg_dumpall -c -U postgres > dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
+docker exec -t postgres_container_prod pg_dump -U postgres  prod_tts_db > dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
 
-cat dump_14-04-2023_19_51_42.sql | docker exec -i postgres_container_dev  psql -U postgres dev_tts_db
+cat dump_14-04-2023_19_51_42.sql | docker exec -i postgres_container_prod  psql -U postgres prod_tts_db
 
+```
+
+
+## Get Duration script
+
+```bash
+CREATE FUNCTION ROUND(float,int) RETURNS NUMERIC AS $f$
+  SELECT ROUND( CAST($1 AS numeric), $2 )
+$f$ language SQL IMMUTABLE;
+```
+
+```bash
+SELECT dataset.name as dataset_name, ROUND(SUM(sample.trimmed_audio_duration) / 60, 2)   AS minutes, ROUND(SUM(sample.trimmed_audio_duration) / 3600, 2)   AS hours
+FROM sample
+JOIN dataset ON sample.dataset_id = dataset.id
+GROUP BY dataset.name
+ORDER BY dataset.name;
 ```

@@ -127,6 +127,75 @@ class Sample(Base):  # type: ignore
         }
 
 
+# Define a tepmorary Sample Model
+class TempSample(Base):  # type: ignore
+    __tablename__ = "tempsample"
+    id = Column(Integer, primary_key=True, index=True)
+    dataset_id = Column(Integer, ForeignKey("dataset.id"))
+    filename = Column(String(50), unique=False, nullable=True)
+    local_path = Column(String(120), unique=False, nullable=True)
+    local_trimmed_path = Column(String(120), unique=False, nullable=True)
+    s3RawPath = Column(String(120), unique=True, nullable=True)
+    s3TrimmedPath = Column(String(120), unique=True, nullable=True)
+    original_text = Column(String(250), unique=False, nullable=True)
+    asr_text = Column(String(250), unique=False, nullable=True)
+    duration = Column(Float, unique=False, nullable=True)
+    trimmed_audio_duration = Column(Float, unique=False, nullable=True)
+    sentence_type = Column(String(50), unique=False, nullable=True)
+    sentence_length = Column(Integer, unique=False, nullable=True)
+    sampling_rate = Column(Integer, unique=False, nullable=True)
+    sample_format = Column(String(10), unique=False, nullable=True)
+    isPCM = Column(Boolean, unique=False, nullable=True)
+    n_channel = Column(Integer, unique=False, nullable=True)
+    format = Column(String(10), unique=False, nullable=True)
+    peak_volume_db = Column(Float, unique=False, nullable=True)
+    size = Column(Integer, unique=False, nullable=True)
+    isValid = Column(Boolean, unique=False, nullable=True)
+    trim_start = Column(Float, unique=False, nullable=True)
+    trim_end = Column(Float, unique=False, nullable=True)
+    longest_pause = Column(Float, unique=False, nullable=True)
+    wer = Column(Float, unique=False, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("s3TrimmedPath", name="_temp_s3TrimmedPath_uc"),
+        UniqueConstraint("s3RawPath", name="_temp_s3RawPath_uc"),
+        # dataset id and sample filename should be unique
+        UniqueConstraint("dataset_id", "filename", name="_temp_dataset_id_filename_uc"),
+    )  # Example for such cases combination of filename and s3RawPath should be unique
+
+    def __repr__(self):
+        return f"{self.to_dict()}"
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "dataset_id": self.dataset_id,
+            "filename": self.filename,
+            "local_path": self.local_path,
+            "local_trimmed_path": self.local_trimmed_path,
+            "s3RawPath": self.s3RawPath,
+            "s3TrimmedPath": self.s3TrimmedPath,
+            "original_text": self.original_text,
+            "duration": self.duration,
+            "trimmed_audio_duration": self.trimmed_audio_duration,
+            "sentence_type": self.sentence_type,
+            "sentence_length": self.sentence_length,
+            "sampling_rate": self.sampling_rate,
+            "sample_format": self.sample_format,
+            "isPCM": self.isPCM,
+            "n_channel": self.n_channel,
+            "format": self.format,
+            "peak_volume_db": self.peak_volume_db,
+            "size": self.size,
+            "isValid": self.isValid,
+            "asr_text": self.asr_text,
+            "trim_start": self.trim_start,
+            "trim_end": self.trim_end,
+            "longest_pause": self.longest_pause,
+            "wer": self.wer,
+        }
+
+
 # Define a Annotation Model in which we will store the following information for an annotation:
 # id, annotator_id, sample_id, the date and time when the annotation was created and annotation fields
 # status Enumeration y defauld it is NULL, Approved, Rejected
