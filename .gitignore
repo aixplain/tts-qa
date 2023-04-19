@@ -21,6 +21,8 @@ backend/xview2/
 # ignore weights
 **/weights/
 
+
+notebooks/batches/
 alembic/versions/
 configs/login_config.yaml
 # ignore only root data

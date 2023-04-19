@@ -16,7 +16,7 @@ from src.logger import root_logger
 from src.paths import paths
 from src.service.models import Annotation, Annotator, Base, Dataset, Sample  # noqa: F401
 from src.utils import utils
-from src.utils.audio import asr_and_trim, trim_audio
+from src.utils.audio import asr_and_trim, trim_audio, trim_only
 
 
 app_logger = root_logger.getChild("trimmer")
@@ -42,9 +42,28 @@ bucket_name = os.environ.get("S3_BUCKET_NAME")
 dataset_dir = os.environ.get("S3_DATASET_DIR")
 
 
-def postprocess(session_, sample, language):
+def asr_and_trim_(session_, sample, language):
     response = asr_and_trim(sample.s3RawPath, language)
     sample.asr_text = str(response["asr_text"])
+    sample.trim_start = round(float(response["trim_start"]), 2)
+    sample.trim_end = round(float(response["trim_end"]), 2)
+    sample.trimmed_audio_duration = round(float(response["trimmed_audio_duration"]), 2)
+    sample.longest_pause = round(float(response["longest_pause"]), 2)
+    sample.wer = round(float(utils.calculate_wer(sample.original_text, sample.asr_text)), 2)
+    out_path = trim_audio(sample.local_path, sample.trim_start, sample.trim_end, sample.local_path.replace("raw", "trimmed"))
+    # update sample
+    object_key = out_path.split(f"{str(paths.LOCAL_BUCKET_DIR)}/")[1]
+    s3TrimmedPath = f"s3://{bucket_name}/{object_key}"
+
+    sample.local_trimmed_path = out_path
+    sample.s3TrimmedPath = str(s3TrimmedPath)
+    session_.add(sample)
+    s3.upload_file(out_path, bucket_name, object_key)
+    session_.commit()
+
+
+def trim_only_(session_, sample, language):
+    response = trim_only(sample.local_path)
     sample.trim_start = round(float(response["trim_start"]), 2)
     sample.trim_end = round(float(response["trim_end"]), 2)
     sample.trimmed_audio_duration = round(float(response["trimmed_audio_duration"]), 2)
@@ -93,7 +112,10 @@ def process_datasets():
             # do the above as threads
             with ThreadPoolExecutor(max_workers=10) as executor:
                 for sample in samples:
-                    executor.submit(postprocess, session, sample, language)
+                    if sample.asr is None:
+                        executor.submit(asr_and_trim_, session, sample, language)
+                    else:
+                        executor.submit(trim_only_, session, sample, language)
 
             # get samples with asr_text = null
             samples = (

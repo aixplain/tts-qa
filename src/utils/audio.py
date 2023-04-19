@@ -5,8 +5,24 @@ import librosa
 import pandas as pd
 import soundfile as sf
 from aixtend.factories.model_factory import ModelFactory
+from pyannote.audio import Model
+from pyannote.audio.pipelines import VoiceActivityDetection
 from pydub import AudioSegment
 from pydub.utils import mediainfo
+
+
+modelPyannote = Model.from_pretrained("pyannote/segmentation", use_auth_token="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")
+vad_pipeline = VoiceActivityDetection(segmentation=modelPyannote)
+HYPER_PARAMETERS = {
+    # onset/offset activation thresholds
+    "onset": 0.5,
+    "offset": 0.5,
+    # remove speech regions shorter than that many seconds.
+    "min_duration_on": 0.0,
+    # fill non-speech regions shorter than that many seconds.
+    "min_duration_off": 0.05,
+}
+vad_pipeline.instantiate(HYPER_PARAMETERS)
 
 
 api_keys = {
@@ -76,6 +92,31 @@ def asr_and_trim(s3path, language="en"):
         "trim_end": 0,
         "trimmed_audio_duration": 0,
         "longest_pause": 0,
+    }
+
+
+def trim_only(path):
+    vad = vad_pipeline(path)
+    timeline = vad.get_timeline().support()
+    longest_pause = 0
+    previous_end = 0
+    for i, segment in enumerate(timeline):
+        start, end = list(segment)
+        if i == 0:
+            start_time = start
+        if i == len(timeline) - 1:
+            end_time = end
+        if i > 0:
+            pause = start - previous_end
+            if pause > longest_pause:
+                longest_pause = pause
+        previous_end = end
+    audio_duration = end_time - start_time
+    return {
+        "trim_start": start_time,
+        "trim_end": end_time,
+        "trimmed_audio_duration": audio_duration,
+        "longest_pause": longest_pause,
     }
 
 

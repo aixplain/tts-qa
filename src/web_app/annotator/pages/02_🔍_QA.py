@@ -169,6 +169,10 @@ def app():
             response = requests.get(BACKEND_URL + f"/datasets/{st.session_state['dataset_id']}/next_sample")
             if response.status_code == 200:
                 response = response.json()
+                if "message" in response:
+                    st.session_state["sample"] = None
+                    st.session_state["stats"] = None
+                    return
                 sample = response["sample"]
                 stats = response["stats"]
                 st.session_state["sample"] = sample
@@ -258,12 +262,7 @@ def app():
         st.session_state["annotate_button"] = False
         st.session_state["isFirstRun"] = True
         st.experimental_rerun()
-    # progress_status = st.sidebar.empty()
-    # progress_bar = st.sidebar.empty()
-    # Infomation on remaining and rated samples count
-    stats = None  # TODO: Get stats from server
-    # progress_status.write(f"{stats['labeled']} Rated, {stats['unlabeled']} Remaining")
-    # my_bar = progress_bar.progress(float(stats["labeled"] / stats["unlabeled"]))
+
     if st.session_state["dataset_id"] is not None:
 
         if st.session_state["query_button"] and st.session_state["isFirstRun"]:
@@ -275,56 +274,56 @@ def app():
             st.session_state["query_button"] = False
             st.session_state["annotate_button"] = False
         # add progresss bar
-        progress_bar = st.progress(0, text="Progress")
-        progress = st.session_state["stats"]["annotated"] / st.session_state["stats"]["total"]
-        progress_bar.progress(
-            progress,
-            text=f"Progress: {st.session_state['stats']['annotated']} Rated, {st.session_state['stats']['total'] - st.session_state['stats']['annotated']} Remaining",
-        )
+        if st.session_state["stats"] is not None:
+            progress_bar = st.progress(0, text="Progress")
+            progress = st.session_state["stats"]["annotated"] / st.session_state["stats"]["total"]
+            progress_bar.progress(
+                progress,
+                text=f"Progress: {st.session_state['stats']['annotated']} Rated, {st.session_state['stats']['total'] - st.session_state['stats']['annotated']} Remaining out of {st.session_state['stats']['total']} recordings",
+            )
 
-        if not st.session_state["isFirstRun"]:
-            if "message" not in st.session_state["sample"]:
+        if st.session_state["sample"] is not None:
 
-                # Input sentence
-                sample_container(st.session_state["sample"])
+            # Input sentence
+            sample_container(st.session_state["sample"])
 
-                with st.form("my_form"):
-                    isAccentRight = st.checkbox("Is the accent right?", value=st.session_state["user_input"]["isAccentRight"])
-                    isPronunciationRight = st.checkbox("Is the pronunciation right?", value=st.session_state["user_input"]["isPronunciationRight"])
-                    isClean = st.checkbox("Is the recording clean - no background noise?", value=st.session_state["user_input"]["isClean"])
-                    isPausesRight = st.checkbox("Is the sound free of any distinct pauses?", value=st.session_state["user_input"]["isPausesRight"])
-                    isSpeedRight = st.checkbox("Is the speed of the actor normal?", value=st.session_state["user_input"]["isSpeedRight"])
-                    isConsisent = st.checkbox(
-                        "Is the actor's voice consistent and similar across all segments?", value=st.session_state["user_input"]["isConsisent"]
-                    )
-                    feedback = st.text_area("Feedback", value=st.session_state["user_input"]["feedback"])
-                    discard = st.checkbox("Discard", value=False)
+            with st.form("my_form"):
+                isAccentRight = st.checkbox("Is the accent right?", value=st.session_state["user_input"]["isAccentRight"])
+                isPronunciationRight = st.checkbox("Is the pronunciation right?", value=st.session_state["user_input"]["isPronunciationRight"])
+                isClean = st.checkbox("Is the recording clean - no background noise?", value=st.session_state["user_input"]["isClean"])
+                isPausesRight = st.checkbox("Is the sound free of any distinct pauses?", value=st.session_state["user_input"]["isPausesRight"])
+                isSpeedRight = st.checkbox("Is the speed of the actor normal?", value=st.session_state["user_input"]["isSpeedRight"])
+                isConsisent = st.checkbox(
+                    "Is the actor's voice consistent and similar across all segments?", value=st.session_state["user_input"]["isConsisent"]
+                )
+                feedback = st.text_area("Feedback", value=st.session_state["user_input"]["feedback"])
+                discard = st.checkbox("Discard", value=False)
 
-                    st.session_state["user_input"]["isAccentRight"] = isAccentRight
-                    st.session_state["user_input"]["isPronunciationRight"] = isPronunciationRight
-                    st.session_state["user_input"]["isClean"] = isClean
-                    st.session_state["user_input"]["isPausesRight"] = isPausesRight
-                    st.session_state["user_input"]["isSpeedRight"] = isSpeedRight
-                    st.session_state["user_input"]["isConsisent"] = isConsisent
-                    st.session_state["user_input"]["feedback"] = feedback
+                st.session_state["user_input"]["isAccentRight"] = isAccentRight
+                st.session_state["user_input"]["isPronunciationRight"] = isPronunciationRight
+                st.session_state["user_input"]["isClean"] = isClean
+                st.session_state["user_input"]["isPausesRight"] = isPausesRight
+                st.session_state["user_input"]["isSpeedRight"] = isSpeedRight
+                st.session_state["user_input"]["isConsisent"] = isConsisent
+                st.session_state["user_input"]["feedback"] = feedback
 
-                    submitted = st.form_submit_button("Submit")
-                    if submitted:
-                        if feedback == "" and discard == True:
-                            st.error("Please provide feedback when discarding a sample")
+                submitted = st.form_submit_button("Submit")
+                if submitted:
+                    if feedback == "" and discard == True:
+                        st.error("Please provide feedback when discarding a sample")
+                    else:
+                        if discard:
+                            status = "Discarded"
                         else:
-                            if discard:
-                                status = "Discarded"
-                            else:
-                                status = "Reviewed"
-                            st.session_state["user_input"]["status"] = status
-                            st.success("Submitted!")
-                            st.session_state["query_button"] = True
-                            st.session_state["annotate_button"] = True
-                            st.experimental_rerun()
+                            status = "Reviewed"
+                        st.session_state["user_input"]["status"] = status
+                        st.success("Submitted!")
+                        st.session_state["query_button"] = True
+                        st.session_state["annotate_button"] = True
+                        st.experimental_rerun()
 
-            else:
-                st.warning("No more samples to rate")
+        else:
+            st.warning("No more samples to rate")
 
     else:
         st.warning("Select Annotator and Dataset")
