@@ -90,6 +90,7 @@ class Sample(Base):  # type: ignore
     __table_args__ = (
         UniqueConstraint("s3TrimmedPath", name="_s3TrimmedPath_uc"),
         UniqueConstraint("s3RawPath", name="_s3RawPath_uc"),
+        UniqueConstraint("filename", name="_filename_uc"),
         # dataset id and sample filename should be unique
         UniqueConstraint("dataset_id", "filename", name="_dataset_id_filename_uc"),
     )  # Example for such cases combination of filename and s3RawPath should be unique

@@ -11,6 +11,7 @@ from pyannote.audio.pipelines import VoiceActivityDetection
 from pydub import AudioSegment
 from tqdm import tqdm
 from whisper_model import WhisperASR
+from glob import glob
 
 
 def edit_distance(s1, s2):
@@ -44,19 +45,25 @@ HYPER_PARAMETERS = {
 pipeline.instantiate(HYPER_PARAMETERS)
 
 
+language = "en"
+batch = "batches_English3/"
+padding = 0.25
+
+
 print("Loading Whisper model...")
 
-whisper_model = WhisperASR(model_size="large-v2", language="french")
+lang_map = {
+    "en": "english",
+    "fr": "french",
+    "es": "spanish",
+    "de": "german",
+    "it": "italian",
+}
+whisper_model = WhisperASR(model_size="large-v2", language=lang_map[language])
 whisper_model.load()
 
 
-batch = "batches/"
-padding = 0.25
-
-from glob import glob
-
-
-filenames = glob(batch + "From*.wav")
+filenames = glob(batch + "*.wav")
 for filename in filenames:
     print(f"Processing {filename}")
     if os.path.exists(filename + ".vad.bin"):
@@ -73,13 +80,18 @@ for filename in filenames:
 
     data = AudioSegment.from_file(filename)
     # read start_loc and end_loc from wav file name  using regex
-    start_loc = int(re.search(r"From (\d+) -", filename).group(1))
-    end_loc = int(re.search(r"- (\d+)", filename).group(1))
+    if language == "fr":
+        start_loc = int(re.search(r"From (\d+) -", filename).group(1))
+        end_loc = int(re.search(r"- (\d+)", filename).group(1))
+    elif language == "en":
+        # reg sdhould work on start_EN00017721-end_EN00018466.wav
+        start_loc = int(re.search(r"start_EN(\d+)-", filename).group(1))
+        end_loc = int(re.search(r"-end_EN(\d+)", filename).group(1))
     print(f"start_loc: {start_loc}, end_loc: {end_loc}")
 
     sentences = {}
     inverseSentences = {}
-    df_sentences = pd.read_csv("batches/fr - fr.csv")
+    df_sentences = pd.read_csv(f"{language} - {language}.csv")
     id_int = df_sentences["unique_identifier"].apply(lambda x: int(x[2:]))
     df_sentences["id_int"] = id_int
     df_sentences.set_index("id_int", inplace=True)
@@ -211,8 +223,8 @@ for filename in filenames:
         sentence = row["sentence"]
         status = row["status"]
         if status == "assigned":
-            wav_path = os.path.join(wav_folder, "assigned", "FR" + format_int(row["sentenceNumber"]) + ".wav")
+            wav_path = os.path.join(wav_folder, "assigned", f"{language.upper()}" + format_int(row["sentenceNumber"]) + ".wav")
         else:
-            wav_path = os.path.join(wav_folder, "not_assigned", "FR" + format_int(row["sentenceNumber"]) + ".wav")
+            wav_path = os.path.join(wav_folder, "not_assigned", f"{language.upper()}" + format_int(row["sentenceNumber"]) + ".wav")
 
         outpath = trim_audio(filename, start, end, wav_path)

@@ -112,7 +112,7 @@ def process_datasets():
             # do the above as threads
             with ThreadPoolExecutor(max_workers=10) as executor:
                 for sample in samples:
-                    if sample.asr is None:
+                    if sample.asr_text is None:
                         executor.submit(asr_and_trim_, session, sample, language)
                     else:
                         executor.submit(trim_only_, session, sample, language)
