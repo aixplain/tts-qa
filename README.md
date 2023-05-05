@@ -43,3 +43,22 @@ JOIN dataset ON sample.dataset_id = dataset.id
 GROUP BY dataset.name
 ORDER BY dataset.name;
 ```
+
+Sum of the duration of all the samples in a dataset
+
+```bash
+SELECT SUM(sample.trimmed_audio_duration) / 60 / 60 as duration_after_trimming
+FROM sample
+JOIN dataset ON sample.dataset_id = dataset.id
+WHERE dataset.name LIKE '%' || 'English' || '%';
+```
+
+Sum of the duration of all the samples for each dataset.language
+
+```bash
+SELECT dataset.language as dataset_name, ROUND(SUM(sample.trimmed_audio_duration) / 60, 2)   AS minutes, ROUND(SUM(sample.trimmed_audio_duration) / 3600, 2)   AS hours
+FROM sample
+JOIN dataset ON sample.dataset_id = dataset.id
+GROUP BY dataset.language
+ORDER BY dataset.language;
+```

@@ -20,7 +20,7 @@
 backend/xview2/
 # ignore weights
 **/weights/
-
+**/data/
 
 notebooks/batches**
 alembic/versions/

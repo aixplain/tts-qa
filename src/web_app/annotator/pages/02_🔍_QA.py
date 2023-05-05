@@ -287,17 +287,24 @@ def app():
             # Input sentence
             sample_container(st.session_state["sample"])
 
-            with st.form("my_form"):
-                isAccentRight = st.checkbox("Is the accent right?", value=st.session_state["user_input"]["isAccentRight"])
-                isPronunciationRight = st.checkbox("Is the pronunciation right?", value=st.session_state["user_input"]["isPronunciationRight"])
-                isClean = st.checkbox("Is the recording clean - no background noise?", value=st.session_state["user_input"]["isClean"])
-                isPausesRight = st.checkbox("Is the sound free of any distinct pauses?", value=st.session_state["user_input"]["isPausesRight"])
-                isSpeedRight = st.checkbox("Is the speed of the actor normal?", value=st.session_state["user_input"]["isSpeedRight"])
-                isConsisent = st.checkbox(
-                    "Is the actor's voice consistent and similar across all segments?", value=st.session_state["user_input"]["isConsisent"]
-                )
-                feedback = st.text_area("Feedback", value=st.session_state["user_input"]["feedback"])
+            # create a divider
+            st.markdown("---")
+            # ask if you want to Discard or Save
+            col1, col2 = st.columns(2)
+            with col1:
                 discard = st.checkbox("Discard", value=False)
+
+            if discard:
+                col1, col2 = st.columns(2)
+                with col1:
+                    isAccentRight = True if st.checkbox("Accent is Wrong", value=False) else False
+                    isPronunciationRight = True if st.checkbox("Pronunciation is Wrong", value=False) else False
+                    isClean = True if st.checkbox("Recording is not Clean", value=False) else False
+                    isPausesRight = True if st.checkbox("Pauses are not right", value=False) else False
+                    isSpeedRight = True if st.checkbox("Speed is not right", value=False) else False
+                    isConsisent = True if st.checkbox("Voice is not consistent", value=False) else False
+                with col2:
+                    feedback = st.text_area("Feedback", value=st.session_state["user_input"]["feedback"])
 
                 st.session_state["user_input"]["isAccentRight"] = isAccentRight
                 st.session_state["user_input"]["isPronunciationRight"] = isPronunciationRight
@@ -306,21 +313,27 @@ def app():
                 st.session_state["user_input"]["isSpeedRight"] = isSpeedRight
                 st.session_state["user_input"]["isConsisent"] = isConsisent
                 st.session_state["user_input"]["feedback"] = feedback
-
-                submitted = st.form_submit_button("Submit")
+            else:
+                st.session_state["user_input"]["isAccentRight"] = True
+                st.session_state["user_input"]["isPronunciationRight"] = True
+                st.session_state["user_input"]["isClean"] = True
+                st.session_state["user_input"]["isPausesRight"] = True
+                st.session_state["user_input"]["isSpeedRight"] = True
+                st.session_state["user_input"]["isConsisent"] = True
+                st.session_state["user_input"]["feedback"] = ""
+            col1, col2 = st.columns((10, 1))
+            with col2:
+                submitted = st.button("Submit")
                 if submitted:
-                    if feedback == "" and discard == True:
-                        st.error("Please provide feedback when discarding a sample")
+                    if discard:
+                        status = "Discarded"
                     else:
-                        if discard:
-                            status = "Discarded"
-                        else:
-                            status = "Reviewed"
-                        st.session_state["user_input"]["status"] = status
-                        st.success("Submitted!")
-                        st.session_state["query_button"] = True
-                        st.session_state["annotate_button"] = True
-                        st.experimental_rerun()
+                        status = "Reviewed"
+                    st.session_state["user_input"]["status"] = status
+                    st.success("Submitted!")
+                    st.session_state["query_button"] = True
+                    st.session_state["annotate_button"] = True
+                    st.experimental_rerun()
 
         else:
             st.warning("No more samples to rate")
