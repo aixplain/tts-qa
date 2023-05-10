@@ -4,7 +4,7 @@ import time
 import librosa
 import pandas as pd
 import soundfile as sf
-from aixtend.factories.model_factory import ModelFactory
+from aixplain.factories.model_factory import ModelFactory
 from pyannote.audio import Model
 from pyannote.audio.pipelines import VoiceActivityDetection
 from pydub import AudioSegment

@@ -40,6 +40,7 @@ $f$ language SQL IMMUTABLE;
 SELECT dataset.name as dataset_name, ROUND(SUM(sample.trimmed_audio_duration) / 60, 2)   AS minutes, ROUND(SUM(sample.trimmed_audio_duration) / 3600, 2)   AS hours
 FROM sample
 JOIN dataset ON sample.dataset_id = dataset.id
+WHERE dataset.name NOT LIKE '%English%' AND dataset.name NOT LIKE '%German%'
 GROUP BY dataset.name
 ORDER BY dataset.name;
 ```

@@ -45,8 +45,7 @@ HYPER_PARAMETERS = {
 pipeline.instantiate(HYPER_PARAMETERS)
 
 
-language = "fr"
-batches = ["batches_French5_2/", "batches_French6_1/"]
+batches = ["batches_English_test/"]
 padding = 0.25
 
 
@@ -59,9 +58,16 @@ lang_map = {
     "de": "german",
     "it": "italian",
 }
-whisper_model = WhisperASR(model_size="large-v2", language=lang_map[language])
-whisper_model.load()
+
 for batch in batches:
+    if "English" in batch:
+        language = "en"
+    elif "French" in batch:
+        language = "fr"
+    elif "German" in batch:
+        language = "de"
+    whisper_model = WhisperASR(model_size="large-v2", language=lang_map[language])
+    whisper_model.load()
     print(f"Processing batch {batch}")
     filenames = glob(batch + "*.wav")
     for filename in filenames:
@@ -84,12 +90,14 @@ for batch in batches:
             start_loc = int(re.search(r"From (\d+) -", filename).group(1))
             end_loc = int(re.search(r"- (\d+)", filename).group(1))
         elif language == "en":
-            # reg sdhould work on start_EN00017721-end_EN00018466.wav
-            start_loc = int(re.search(r"start_EN(\d+)-", filename).group(1))
-            end_loc = int(re.search(r"-end_EN(\d+)", filename).group(1))
+            # reg sdhould work on EN00000003-EN00000012
+            start_loc = int(re.search(r"EN(\d+)-", filename).group(1))
+            end_loc = int(re.search(r"-EN(\d+)", filename).group(1))
         elif language == "de":
-            start_loc = 37
-            end_loc = 55
+            # reg sdhould work on start_1-end_500
+            start_loc = int(re.search(r"start_DE(\d+)-", filename).group(1))
+            end_loc = int(re.search(r"-end_DE(\d+)", filename).group(1))
+
         print(f"start_loc: {start_loc}, end_loc: {end_loc}")
 
         sentences = {}
