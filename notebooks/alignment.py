@@ -45,7 +45,7 @@ HYPER_PARAMETERS = {
 pipeline.instantiate(HYPER_PARAMETERS)
 
 
-batches = ["batches_English_test/"]
+batches = ["batches_EnglishM2/"]
 padding = 0.25
 
 
@@ -95,8 +95,8 @@ for batch in batches:
             end_loc = int(re.search(r"-EN(\d+)", filename).group(1))
         elif language == "de":
             # reg sdhould work on start_1-end_500
-            start_loc = int(re.search(r"start_DE(\d+)-", filename).group(1))
-            end_loc = int(re.search(r"-end_DE(\d+)", filename).group(1))
+            start_loc = int(re.search(r"DE(\d+) -", filename).group(1))
+            end_loc = int(re.search(r"- DE(\d+)", filename).group(1))
 
         print(f"start_loc: {start_loc}, end_loc: {end_loc}")
 
@@ -108,6 +108,8 @@ for batch in batches:
         df_sentences.set_index("id_int", inplace=True)
         # include only ids in between start_loc and end_loc
         df_sentences = df_sentences.loc[start_loc:end_loc]
+
+        print(f"There are {len(df_sentences)} sentences in this range")
         for index, row in df_sentences.iterrows():
             sentenceNum = int(index)
             sentence = row["text"]
@@ -205,6 +207,9 @@ for batch in batches:
         # if there is inf  drop it
         df = df.replace([np.inf, -np.inf], np.nan)
         df.dropna(inplace=True)
+
+        print(f"Assigned {len(df[df.status=='assigned'])} segments")
+        print(f"Not assigned {len(df[df.status=='not_assigned'])} segments")
 
         # if there are multiple rows with same sentenceNumber take the last one and drop the rest
         df = df.sort_values(by=["sentenceNumber"])
