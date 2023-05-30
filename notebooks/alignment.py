@@ -45,7 +45,7 @@ HYPER_PARAMETERS = {
 pipeline.instantiate(HYPER_PARAMETERS)
 
 
-batches = ["batches_EnglishM2/"]
+batches = ["batches_French8/"]
 padding = 0.25
 
 
