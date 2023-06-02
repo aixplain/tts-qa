@@ -72,12 +72,14 @@ def list_samples(id: int, top_k=50) -> List[SampleModel]:
 
 # insert a sample
 @router.post("/{id}/samples")
-def insert_sample(id: int, text: str, audio_path: str, sentence_length: int = None, sentence_type: str = "statement") -> Union[SampleModel, InfoModel]:
+def insert_sample(
+    id: int, text: str, audio_path: str, sentence_length: int = None, sentence_type: str = "statement", deliverable: str = None
+) -> Union[SampleModel, InfoModel]:
     if sentence_length is None:
         sentence_length = len(text.split())
 
     try:
-        sample = db_utils.insert_sample(id, text, audio_path, sentence_type, sentence_length)
+        sample = db_utils.insert_sample(id, text, audio_path, sentence_type, sentence_length, deliverable=deliverable)
         return SampleModel(**sample.to_dict())
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
@@ -111,7 +113,7 @@ def handle_exceptions(task: asyncio.Task):
 
 
 @router.get("/{id}/upload_from_csv")
-async def upload(id, csv_path: str):
-    failed, n_success = await db_utils.upload_wav_samples(id, csv_path)
+async def upload(id, csv_path: str, deliverable: str = None):
+    failed, n_success = await db_utils.upload_wav_samples(id, csv_path, deliverable=deliverable)
 
     return {"failed": failed, "n_success": n_success}

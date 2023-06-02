@@ -628,7 +628,7 @@ def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
     return samples[0], {"annotated": annotated, "not_annotated": not_annotated, "total": annotated + not_annotated}
 
 
-def upload_file(session_, row, dataset_id, filename, s3, bucket_name):
+def upload_file(session_, row, dataset_id, filename, s3, bucket_name, deliverable):
     # make sure that db is closed
 
     meta = evaluate_audio(row["local_path"])
@@ -648,6 +648,7 @@ def upload_file(session_, row, dataset_id, filename, s3, bucket_name):
 
     sample = Sample(
         dataset_id=dataset_id,
+        deliverable=deliverable,
         filename=filename,
         local_path=local_path,
         s3RawPath=f"s3://{bucket_name}/{row['s3RawPath']}",
@@ -676,7 +677,7 @@ def upload_file(session_, row, dataset_id, filename, s3, bucket_name):
     session_.commit()
 
 
-async def upload_wav_samples(dataset_id: int, csv_path: str) -> Tuple[List[str], int]:
+async def upload_wav_samples(dataset_id: int, csv_path: str, deliverable: str) -> Tuple[List[str], int]:
 
     # get dataset
     dataset = get_dataset_by_id(dataset_id)
@@ -707,7 +708,7 @@ async def upload_wav_samples(dataset_id: int, csv_path: str) -> Tuple[List[str],
                 continue
             # run with thread pool
             with ThreadPoolExecutor(max_workers=10) as executor:
-                future = executor.submit(upload_file, session, row, dataset_id, filename, s3, bucket_name)
+                future = executor.submit(upload_file, session, row, dataset_id, filename, s3, bucket_name, deliverable)
                 future.result()
 
         except Exception as e:
@@ -725,6 +726,7 @@ def insert_sample(
     audio_path: str,
     sentence_type: str,
     sentence_length: int,
+    deliverable: str,
 ):
     """Insert a new sample into the database.
 
@@ -773,6 +775,7 @@ def insert_sample(
 
             sample = Sample(
                 dataset_id=dataset_id,
+                deliverable=deliverable,
                 filename=filename,
                 local_path=local_path,
                 original_text=text,

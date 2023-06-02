@@ -110,7 +110,7 @@ def app():
                     st.write(r.json())
                     st.session_state["dataset"] = r.json()
             elif selected_dataset_option == "Upload Recordings":
-
+                deliverable = st.text_input("Deliverable Name")
                 col1, col2 = st.columns(2)
                 with col1:
                     # show a sample csv
@@ -129,6 +129,7 @@ def app():
                     st.markdown(href, unsafe_allow_html=True)
                     # upload zip file
                     uploaded_zip_file = st.file_uploader("Upload WAVs as zip", type=["zip"])
+
                 if uploaded_file is not None and uploaded_zip_file is not None:
                     if st.button("Upload"):
                         st.session_state["failed_files"] = []
@@ -177,6 +178,7 @@ def app():
                             params = {
                                 "wavs_path": temp_dir,
                                 "csv_path": csv_dir,
+                                "deliverable": None if deliverable == "" else deliverable,
                             }
 
                             response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)

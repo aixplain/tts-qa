@@ -45,7 +45,7 @@ HYPER_PARAMETERS = {
 pipeline.instantiate(HYPER_PARAMETERS)
 
 
-batches = ["batches_French8/"]
+batches = ["batches_EnglishM3/", "batches_GermanM2/"]
 padding = 0.25
 
 
@@ -95,8 +95,8 @@ for batch in batches:
             end_loc = int(re.search(r"-EN(\d+)", filename).group(1))
         elif language == "de":
             # reg sdhould work on start_1-end_500
-            start_loc = int(re.search(r"DE(\d+) -", filename).group(1))
-            end_loc = int(re.search(r"- DE(\d+)", filename).group(1))
+            start_loc = int(re.search(r"DE(\d+)-", filename).group(1))
+            end_loc = int(re.search(r"-DE(\d+)", filename).group(1))
 
         print(f"start_loc: {start_loc}, end_loc: {end_loc}")
 
