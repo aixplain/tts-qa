@@ -58,6 +58,9 @@ def app():
     if "failed_files" not in st.session_state:
         st.session_state["failed_files"] = []
 
+    if "job_id" not in st.session_state:
+        st.session_state["job_id"] = None
+
     def get_datasets():
         return requests.get(BACKEND_URL + "/datasets").json()
 
@@ -132,6 +135,8 @@ def app():
 
                 if uploaded_file is not None and uploaded_zip_file is not None:
                     if st.button("Upload"):
+                        st.session_state["job_id"] = None
+
                         st.session_state["failed_files"] = []
                         # read csv file
                         csv = pd.read_csv(uploaded_file, delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type"])
@@ -143,9 +148,8 @@ def app():
                             # read and unzip zip file
                             zip_bytes = uploaded_zip_file.read()
                             zip_file = io.BytesIO(zip_bytes)
-                            # extract zip file to temp directory
-                            tempdir = tempfile.TemporaryDirectory()
-                            temp_dir = tempdir.name
+                            # extract zip file to temp directory which will not delete until the program is running
+                            temp_dir = tempfile.mkdtemp()
                             with zipfile.ZipFile(zip_file, "r") as zip_ref:
                                 zip_ref.extractall(temp_dir)
                             # get all wav files in temp directory
@@ -175,28 +179,32 @@ def app():
                             df.to_csv(csv_dir, index=False)
                             # preprocess all files and save them to the database
                             st.write("Uploading files to database...")
+
                             params = {
                                 "wavs_path": temp_dir,
                                 "csv_path": csv_dir,
                                 "deliverable": None if deliverable == "" else deliverable,
                             }
-
                             response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)
                             if response.status_code == 200:
-                                n_success = response.json()["n_success"]
-                                st.session_state["failed_files"] = response.json()["failed"]
-                                st.success(f"Successfully uploaded {n_success} files")
-                                if len(st.session_state["failed_files"]) > 0:
-                                    st.write("The following files could not be uploaded retry to upload them:")
-                                    st.write(st.session_state["failed_files"])
-                                    # download
-                                    csv = pd.DataFrame(st.session_state["failed_files"], columns=["file_name"])
-
-                                    b64 = base64.b64encode(csv.to_csv(index=False).encode()).decode()
-                                    href = f'<a href="data:file/csv;base64,{b64}" download="failed_files.csv">Download failed files</a>'
-                                    st.markdown(href, unsafe_allow_html=True)
+                                st.session_state["job_id"] = response.json()["job_id"]
+                                st.success("Files upload triggered successfully")
                             else:
                                 st.error("An error occured while uploading the files")
+                    if st.session_state["job_id"] is not None and st.button("Check Status"):
+                        progress_bar = st.progress(0)
+                        job_id = st.session_state["job_id"]
+                        response = requests.get(BACKEND_URL + f"/datasets/upload_from_csv_status/{job_id}")
+                        if response.status_code == 200:
+                            # {"status": job.state, "progress": progress, "onboarded_samples": job.info.get("onboarded_samples", 0), "failed_samples": job.info.get("failed_samples", [])}
+                            response_json = response.json()
+                            progress_bar.progress(response_json["progress"])
+                            st.write(f"Samples onboarding for dataset {st.session_state['dataset']['name']} is {response_json['progress']}% complete")
+                            st.write("Status: {}".format(response_json["status"]))
+                            st.write("Onboarded Samples Count: {}".format(response_json["onboarded_samples"]))
+                            st.write("Failed Samples: {}".format(response_json["failed_samples"]))
+                        else:
+                            st.error("An error occured while getting the status of the job")
 
 
 app()

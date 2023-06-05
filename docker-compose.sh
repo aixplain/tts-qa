@@ -15,7 +15,7 @@ echo "POSTGRES_DB: ${POSTGRES_DB}"
 # Start PostgreSQL container for the specified environment
 if [ "$START_STOP" = "start" ]; then
     echo "Starting PostgreSQL container for ${ENV} environment"
-    docker-compose -f docker-compose.postgresql.${ENV}.yml up  -d db
+    docker-compose -f docker-compose.postgresql.${ENV}.yml up  -d
 elif [ "$START_STOP" = "stop" ]; then
     echo "Stopping PostgreSQL container for ${ENV} environment"
     docker-compose -f docker-compose.postgresql.${ENV}.yml down

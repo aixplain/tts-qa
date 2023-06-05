@@ -112,8 +112,29 @@ def handle_exceptions(task: asyncio.Task):
         print(f"An error occurred in the task: {task.exception()}")
 
 
-@router.get("/{id}/upload_from_csv")
-async def upload(id, csv_path: str, deliverable: str = None):
-    failed, n_success = await db_utils.upload_wav_samples(id, csv_path, deliverable=deliverable)
+from src.service.tasks import simulate_onboarding_job
 
-    return {"failed": failed, "n_success": n_success}
+
+@router.get("/{id}/upload_from_csv")
+def upload(id, csv_path: str, deliverable: str = None):
+    job = simulate_onboarding_job.delay(dataset_id=id, csv_path=csv_path, deliverable=deliverable)
+    return {"job_id": job.id}
+
+
+@router.get("/upload_from_csv_status/{job_id}")
+def upload_status(job_id: str):
+    job = simulate_onboarding_job.AsyncResult(job_id)
+    if job.state == "SUCCESS":
+        progress = 100
+    elif job.state == "PENDING":
+        progress = 0
+    else:
+        progress = job.info.get("progress", 0)
+    if job.info is None:
+        return {"status": job.status, "progress": progress, "onboarded_samples": 0, "failed_samples": []}
+    return {
+        "status": job.status,
+        "progress": progress,
+        "onboarded_samples": job.info.get("onboarded_samples", 0),
+        "failed_samples": job.info.get("failed_samples", []),
+    }

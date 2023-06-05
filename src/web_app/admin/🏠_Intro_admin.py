@@ -1,5 +1,4 @@
 import os
-import pdb
 import sys
 
 import streamlit as st
@@ -10,9 +9,11 @@ current_file_path = os.path.dirname(os.path.abspath(__file__))
 # aapedn 3 parent directories to the path
 sys.path.append(os.path.join(current_file_path, "..", "..", "..", ".."))
 
+from dotenv import load_dotenv
+
 from src.logger import root_logger
 from src.paths import paths
-from dotenv import load_dotenv
+
 
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
 
@@ -26,9 +27,9 @@ st.set_page_config(page_title="aiXplain's TTS Data App", page_icon="🎙️", la
 app_logger = root_logger.getChild("web_app::home")
 BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.get("SERVER_PORT"))
 
+import requests
 import yaml
 from yaml.loader import SafeLoader
-import requests
 
 
 config_file_path = paths.LOGIN_CONFIG_PATH
@@ -63,9 +64,9 @@ with st.sidebar:
                         params = {"password": password, "name": name, "email": email, "isadmin": isadmin, "ispreauthorized": True}
                         response = requests.post(f"{BACKEND_URL}/annotators/{username}", params=params)
                         if response.status_code == 200:
-                            response = response.json()
-                            if "message" in response:
-                                st.error(response["message"])
+                            response: str = response.json()  # type: ignore
+                            if "message" in response:  # type: ignore
+                                st.error(response["message"])  # type: ignore
                             else:
                                 st.success("User created successfully")
 
@@ -96,8 +97,8 @@ with st.sidebar:
                         response = requests.post(f"{BACKEND_URL}/annotators/{annotator_id}/datasets/{dataset_id}")
                         if response.status_code == 200:
                             response = response.json()
-                            if response["message"] == "Failed":
-                                st.error(response["error"])
+                            if response["message"] == "Failed":  # type: ignore
+                                st.error(response["error"])  # type: ignore
                             else:
                                 st.success(f"Dataset {dataset_selected} assigned to {annotator_selected}")
                         else:
@@ -116,8 +117,8 @@ with st.sidebar:
                     response = requests.delete(f"{BACKEND_URL}/annotators/{annotator_id}")
                     if response.status_code == 200:
                         response = response.json()
-                        if "message" in response and response["message"] != "Failed":
-                            st.error(response["error"])
+                        if "message" in response and response["message"] != "Failed":  # type: ignore
+                            st.error(response["error"])  # type: ignore
                         else:
                             st.success(f"User {annotator_selected} deleted")
                     else:
