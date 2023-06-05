@@ -191,20 +191,20 @@ def app():
                                 st.success("Files upload triggered successfully")
                             else:
                                 st.error("An error occured while uploading the files")
-                    if st.session_state["job_id"] is not None and st.button("Check Status"):
-                        progress_bar = st.progress(0)
-                        job_id = st.session_state["job_id"]
-                        response = requests.get(BACKEND_URL + f"/datasets/upload_from_csv_status/{job_id}")
-                        if response.status_code == 200:
-                            # {"status": job.state, "progress": progress, "onboarded_samples": job.info.get("onboarded_samples", 0), "failed_samples": job.info.get("failed_samples", [])}
-                            response_json = response.json()
-                            progress_bar.progress(response_json["progress"])
-                            st.write(f"Samples onboarding for dataset {st.session_state['dataset']['name']} is {response_json['progress']}% complete")
-                            st.write("Status: {}".format(response_json["status"]))
-                            st.write("Onboarded Samples Count: {}".format(response_json["onboarded_samples"]))
-                            st.write("Failed Samples: {}".format(response_json["failed_samples"]))
-                        else:
-                            st.error("An error occured while getting the status of the job")
+                    # if st.session_state["job_id"] is not None and st.button("Check Status"):
+                    #     progress_bar = st.progress(0)
+                    #     job_id = st.session_state["job_id"]
+                    #     response = requests.get(BACKEND_URL + f"/datasets/upload_from_csv_status/{job_id}")
+                    #     if response.status_code == 200:
+                    #         # {"status": job.state, "progress": progress, "onboarded_samples": job.info.get("onboarded_samples", 0), "failed_samples": job.info.get("failed_samples", [])}
+                    #         response_json = response.json()
+                    #         progress_bar.progress(response_json["progress"])
+                    #         st.write(f"Samples onboarding for dataset {st.session_state['dataset']['name']} is {response_json['progress']}% complete")
+                    #         st.write("Status: {}".format(response_json["status"]))
+                    #         st.write("Onboarded Samples Count: {}".format(response_json["onboarded_samples"]))
+                    #         st.write("Failed Samples: {}".format(response_json["failed_samples"]))
+                    #     else:
+                    #         st.error("An error occured while getting the status of the job")
 
 
 app()

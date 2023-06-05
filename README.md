@@ -1,10 +1,23 @@
 
 # TTS QA - Quality Assessment Text to Speech Data Annotation Tool
 
+
+## Start Database
+```
+bash docker-compose.sh start
+```
+
+## Start Celery
+```
+celery -A src.service.tasks worker --loglevel=info
+```
 ## Start Backend
 ```
 uvicorn src.service.api:app --port 8089 --reload
 ```
+
+
+
 ## Start Frontend
 ### 1. Annotator
 ```
