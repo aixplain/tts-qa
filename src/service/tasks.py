@@ -1,10 +1,12 @@
 import os
+import shutil
 
 from celery import Celery, Task
 from dotenv import load_dotenv
 
 from src.logger import root_logger
 from src.paths import paths
+from src.utils.alignment_utils import align_wavs
 from src.utils.db_utils import upload_wav_samples
 
 
@@ -39,6 +41,31 @@ app.conf.result_backend = "redis://localhost:6379/0"
 
 
 @app.task(bind=True)
-def simulate_onboarding_job(self: Task, dataset_id: int, csv_path: str, deliverable: str = None):
+def segmented_onboarding_job(self: Task, dataset_id: int, csv_path: str, deliverable: str = None):
     # Simulate a long-running job
+    app_logger.info("Starting segmented onboarding job")
     upload_wav_samples(self, session, dataset_id, csv_path, deliverable=deliverable)
+
+
+@app.task(bind=True)
+def unsegmented_onboarding_job(
+    self: Task, dataset_id: int, language: str, wavs_path: str, csv_path: str, start_id_regex: str, end_id_regex: str, deliverable: str = None
+):
+
+    app_logger.info("Starting unsegmented onboarding job")
+
+    app_logger.info(f"dataset_id: {dataset_id}")
+    app_logger.info(f"wavs_path: {wavs_path}")
+    app_logger.info(f"csv_path: {csv_path}")
+    app_logger.info(f"deliverable: {deliverable}")
+    # do alignment first and then upload
+    aligned_wavs_dir, aligned_csv_path = align_wavs(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+
+    # TODO: make sure that you keep the aligned csv
+    shutil.rmtree(wavs_path, ignore_errors=True)
+    shutil.rmtree(csv_path, ignore_errors=True)
+
+    app_logger.debug(f"aligned_wavs_dirh: {aligned_wavs_dir}")
+
+    # Simulate a long-running job
+    upload_wav_samples(self, session, dataset_id, aligned_csv_path, deliverable=deliverable)

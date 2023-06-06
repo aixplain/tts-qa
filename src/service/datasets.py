@@ -112,18 +112,18 @@ def handle_exceptions(task: asyncio.Task):
         print(f"An error occurred in the task: {task.exception()}")
 
 
-from src.service.tasks import simulate_onboarding_job
+from src.service.tasks import segmented_onboarding_job, unsegmented_onboarding_job
 
 
-@router.get("/{id}/upload_from_csv")
-def upload(id, csv_path: str, deliverable: str = None):
-    job = simulate_onboarding_job.delay(dataset_id=id, csv_path=csv_path, deliverable=deliverable)
+@router.get("/{id}/upload_segmented")
+def upload_segmented(id, csv_path: str, deliverable: str = None):
+    job = segmented_onboarding_job.delay(dataset_id=id, csv_path=csv_path, deliverable=deliverable)
     return {"job_id": job.id}
 
 
-@router.get("/upload_from_csv_status/{job_id}")
-def upload_status(job_id: str):
-    job = simulate_onboarding_job.AsyncResult(job_id)
+@router.get("/check_job_status/{job_id}")
+def check_job_status(job_id: str):
+    job = segmented_onboarding_job.AsyncResult(job_id)
     if job.state == "SUCCESS":
         progress = 100
     elif job.state == "PENDING":
@@ -138,3 +138,19 @@ def upload_status(job_id: str):
         "onboarded_samples": job.info.get("onboarded_samples", 0),
         "failed_samples": job.info.get("failed_samples", []),
     }
+
+
+@router.get("/{id}/upload_unsegmented")
+def upload_unsegmented(id, wavs_path: str, csv_path: str, start_id_regex: str, end_id_regex: str, deliverable: str = None):
+    # get dataset language
+    dataset = db_utils.get_dataset_by_id(id)
+    job = unsegmented_onboarding_job.delay(
+        dataset_id=id,
+        language=dataset.language,
+        wavs_path=wavs_path,
+        csv_path=csv_path,
+        start_id_regex=start_id_regex,
+        end_id_regex=end_id_regex,
+        deliverable=deliverable,
+    )
+    return {"job_id": job.id}

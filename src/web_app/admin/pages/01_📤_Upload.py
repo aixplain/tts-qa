@@ -1,6 +1,8 @@
 import base64
 import io
 import os
+import re
+import shutil
 import sys
 import tempfile
 import zipfile
@@ -126,15 +128,38 @@ def app():
                     uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
 
                 with col2:
+
                     # show a sample zip
                     b64 = base64.b64encode(open(sample_zip_path, "rb").read()).decode()
                     href = f'<a href="data:file/zip;base64,{b64}" download="sample.zip">Download example zip file</a>'
                     st.markdown(href, unsafe_allow_html=True)
                     # upload zip file
                     uploaded_zip_file = st.file_uploader("Upload WAVs as zip", type=["zip"])
+                    # checkif the recordings already segmented and zipped or not using a checkbox
+                    segmented = st.checkbox("Check if recordings are already segmented", value=True)
+
+                    if not segmented:
+                        # ask for a regex term to define start id and end id
+                        st.markdown("Define a regex term to extract start and end id from the file names")
+                        col2_1, col2_2 = st.columns(2)
+                        start_id_regex = col2_1.text_input("Start ID Regex", value=r"From (\d+) -")
+                        end_id_regex = col2_2.text_input("End ID Regex", value=r"- (\d+)")
+
+                        test = st.checkbox("Test Regex")
+                        if test:
+                            # get an example name for wav file and test the regex
+                            example_name = st.text_input("Example File Name", value="From 1 - 10.wav")
+                            if st.button("Test"):
+                                start_id = re.findall(start_id_regex, example_name)
+                                end_id = re.findall(end_id_regex, example_name)
+                                if start_id and end_id:
+                                    st.success("Regex is valid")
+                                else:
+                                    st.error("Regex is invalid")
 
                 if uploaded_file is not None and uploaded_zip_file is not None:
-                    if st.button("Upload"):
+                    button_col1, button_col2 = st.columns((10, 1))
+                    if button_col2.button("Upload"):
                         st.session_state["job_id"] = None
 
                         st.session_state["failed_files"] = []
@@ -153,48 +178,73 @@ def app():
                             with zipfile.ZipFile(zip_file, "r") as zip_ref:
                                 zip_ref.extractall(temp_dir)
                             # get all wav files in temp directory
+                            # pdb.set_trace()
                             wav_files = glob(os.path.join(temp_dir, "**", "*.wav"), recursive=True)
 
                             # create a dataframe with the wav files
                             wav_df = pd.DataFrame(wav_files, columns=["local_path"])
                             # add the filename
                             wav_df["file_name"] = wav_df["local_path"].apply(lambda x: os.path.basename(x))
-                            wav_df["file_name"] = wav_df["file_name"].apply(lambda x: x.upper().replace(".WAV", ".wav"))
 
-                            # merge the csv and the wav dataframe
-                            df = pd.merge(wav_df, csv, on="file_name", how="left")
+                            if segmented:
+                                wav_df["file_name"] = wav_df["file_name"].apply(lambda x: x.upper().replace(".WAV", ".wav"))
+                                # merge the csv and the wav dataframe
+                                df = pd.merge(wav_df, csv, on="file_name", how="left")
 
-                            # check if all files were found
-                            not_found_files = df[df["text"].isnull()]["file_name"].tolist()
+                                # check if all files were found
+                                not_found_files = df[df["text"].isnull()]["file_name"].tolist()
 
-                            if len(not_found_files) > 0:
-                                st.write("The following files were not found in the csv file:")
-                                st.write(not_found_files)
-                                st.warning(
-                                    "Please make sure that the file names in the csv file match the file names in the zip file. Processing of the files will continue with the files that were found."
-                                )
-                            df = df.dropna(subset=["text"])
-                            # save df to a local dir
-                            csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
-                            df.to_csv(csv_dir, index=False)
-                            # preprocess all files and save them to the database
-                            st.write("Uploading files to database...")
+                                if len(not_found_files) > 0:
+                                    st.write("The following files were not found in the csv file:")
+                                    st.write(not_found_files)
+                                    st.warning(
+                                        "Please make sure that the file names in the csv file match the file names in the zip file. Processing of the files will continue with the files that were found."
+                                    )
+                                df = df.dropna(subset=["text"])
+                                # save df to a local dir
+                                csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
+                                df.to_csv(csv_dir, index=False)
+                                # preprocess all files and save them to the database
+                                st.write("Uploading files to database...")
 
-                            params = {
-                                "wavs_path": temp_dir,
-                                "csv_path": csv_dir,
-                                "deliverable": None if deliverable == "" else deliverable,
-                            }
-                            response = requests.get(BACKEND_URL + "/datasets/{}/upload_from_csv".format(st.session_state["dataset"]["id"]), params=params)
-                            if response.status_code == 200:
-                                st.session_state["job_id"] = response.json()["job_id"]
-                                st.success("Files upload triggered successfully")
+                                params = {
+                                    "wavs_path": temp_dir,
+                                    "csv_path": csv_dir,
+                                    "deliverable": None if deliverable == "" else deliverable,
+                                }
+                                response = requests.get(BACKEND_URL + "/datasets/{}/upload_segmented".format(st.session_state["dataset"]["id"]), params=params)
+                                if response.status_code == 200:
+                                    st.session_state["job_id"] = response.json()["job_id"]
+                                    st.success("Files upload triggered successfully")
+                                else:
+                                    st.error("An error occured while uploading the files")
+                                    # remove temp_dir
+                                    shutil.rmtree(temp_dir, ignore_errors=True)
                             else:
-                                st.error("An error occured while uploading the files")
+                                csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
+                                csv.to_csv(csv_dir, index=False)
+                                params = {
+                                    "wavs_path": temp_dir,
+                                    "csv_path": csv_dir,
+                                    "deliverable": None if deliverable == "" else deliverable,
+                                    "start_id_regex": start_id_regex,
+                                    "end_id_regex": end_id_regex,
+                                }
+                                response = requests.get(
+                                    BACKEND_URL + "/datasets/{}/upload_unsegmented".format(st.session_state["dataset"]["id"]), params=params
+                                )
+                                if response.status_code == 200:
+                                    st.session_state["job_id"] = response.json()["job_id"]
+                                    st.success("Files upload triggered successfully")
+                                else:
+                                    st.error("An error occured while uploading the files")
+                                    # remove temp_dir
+                                    shutil.rmtree(temp_dir, ignore_errors=True)
+
                     # if st.session_state["job_id"] is not None and st.button("Check Status"):
                     #     progress_bar = st.progress(0)
                     #     job_id = st.session_state["job_id"]
-                    #     response = requests.get(BACKEND_URL + f"/datasets/upload_from_csv_status/{job_id}")
+                    #     response = requests.get(BACKEND_URL + f"/datasets/upload_segmented_status/{job_id}")
                     #     if response.status_code == 200:
                     #         # {"status": job.state, "progress": progress, "onboarded_samples": job.info.get("onboarded_samples", 0), "failed_samples": job.info.get("failed_samples", [])}
                     #         response_json = response.json()
