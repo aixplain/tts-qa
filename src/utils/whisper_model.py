@@ -7,6 +7,10 @@ from uuid import uuid4
 
 import whisper
 
+from src.logger import root_logger
+
+
+app_logger = root_logger.getChild("whisper-asr")
 
 MODEL_DIR = os.getenv("MODEL_DIR", "/mnt/models")
 MODEL_NAME = os.getenv("MODEL_NAME", "whisper_model")
@@ -14,16 +18,30 @@ MODEL_NAME = os.getenv("MODEL_NAME", "whisper_model")
 
 class WhisperASR:
     def __init__(self, model_size="tiny", language="English"):
+        app_logger.info(f"Initializeing Whisper model: {model_size}")
         self.model = None
         self.ready = False
         options = dict(language=language)
         self.transcribe_options = dict(task="transcribe", **options)
         self.model_size = model_size
 
-    def load(self):
+    def load(self, language: str = None):
+        app_logger.info(f"Loading Whisper model: {self.model_size}")
+        if self.ready:
+            app_logger.warning("Whisper model already loaded need to unload first")
+            return True
+        if language:
+            app_logger.info(f"Setting language to {language}")
+            self.transcribe_options["language"] = language
         model_path = os.path.join(MODEL_DIR, MODEL_NAME)
         self.model = whisper.load_model(self.model_size, download_root=model_path)
         self.ready = True
+        app_logger.info(f"Whisper model loaded")
+
+    def unload(self):
+        self.model = None
+        self.ready = False
+        app_logger.info(f"Whisper model unloaded")
 
     def get_file_from_url(self, url, tempdir):
         _, extension = os.path.splitext(url)

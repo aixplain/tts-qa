@@ -4,6 +4,7 @@ import pickle
 import re
 import shutil
 import tempfile
+import traceback
 from glob import glob
 from typing import Tuple
 
@@ -56,9 +57,11 @@ lang_map = {
     "it": "italian",
 }
 
+whisper_model = WhisperASR(model_size="large-v2", language="english")
+
 
 def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id_regex: str, end_id_regex: str, assigned_only: bool = True) -> Tuple[str, str]:
-    whisper_model = WhisperASR(model_size="large-v2", language=lang_map[language])
+    whisper_model.load(language=lang_map[language])
     app_logger.info(f"wav_path: {wavs_path}")
 
     filenames = glob(os.path.join(wavs_path, "*.wav"))
@@ -94,7 +97,6 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
                 app_logger.info(f"Saved VAD for {filename}")
 
             data = AudioSegment.from_file(filename)
-
             start_loc = int(re.search(start_id_regex, filename).group(1))
             end_loc = int(re.search(end_id_regex, filename).group(1))
 
@@ -121,7 +123,6 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
                     while tmp in inverseSentences:
                         tmp += " _"
                     inverseSentences[tmp] = sentenceNum
-
             sentenceNumber = -1
             segments = {}
             segments_path = os.path.join(temp_dir, filename + ".segments.json")
@@ -149,6 +150,7 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
                         asr = result["predictions"][0]
                         seg["asr"] = asr
                     except:
+                        app_logger.error(f"Failed to run ASR for {filename}")
                         seg["asr"] = ""
                         pass
                     segments[start] = seg
@@ -157,12 +159,10 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
                 with open(segments_path, "w") as fout:
                     json.dump(segments, fout, indent=4)
                 print(f"Saved segments for {filename}")
-
             print(f"Matching segments to sentences for {filename}")
             segments_list = [v for k, v in segments.items()]
             sentences_list = [v for k, v in sentences.items()]
-            distances_matrix = np.ones((len(segments_list), len(sentences))) * 1000
-
+            distances_matrix = np.ones((len(segments_list), len(sentences_list))) * 1000
             for ik in range(len(segments_list)):
                 for jk, sentence in enumerate(sentences_list):
                     try:
@@ -172,7 +172,6 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
 
             # get the best match for each segment
             best_matches = np.argmin(distances_matrix, axis=1)
-
             # # make a dataframe
             columns = ["status", "filename", "sentenceNumber", "sentence", "asr", "start", "end", "ed_dist", "len_dif"]
             df = pd.DataFrame(columns=columns)
@@ -231,36 +230,36 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
             app_logger.info(f"Trimming audio for {filename}, it will be saved in {output_wavs_dir}")
             # columns should be following: local_path,file_name,unique_identifier,text,sentence_length,sentence_type
             columns = ["status", "local_path", "file_name", "unique_identifier", "text", "sentence_length", "sentence_type"]
-            df_final = pd.DataFrame
+            df_final = pd.DataFrame(columns=columns)
             for index, row in tqdm(df.iterrows(), total=len(df)):
                 start = row["start"]
                 end = row["end"]
                 asr = row["asr"]
                 sentence = row["sentence"]
                 status = row["status"]
-                filename = df_sentences.iloc[row["sentenceNumber"]]["file_name"]
+                file_path = row["filename"]
+                filename = df_sentences.loc[row["sentenceNumber"]]["file_name"]
                 # filename = f"{language.upper()}" + format_int(row["sentenceNumber"]) + ".wav"
                 if status == "assigned":
                     wav_path = os.path.join(output_wavs_dir, "assigned", filename)
                 else:
                     wav_path = os.path.join(output_wavs_dir, "not_assigned", filename)
 
-                outpath = trim_audio(filename, start, end, wav_path)
+                outpath = trim_audio(file_path, start, end, wav_path)
                 # create a row for the csv file
                 myrow = {
                     "status": status,
                     "local_path": outpath,
                     "file_name": filename,
-                    "unique_identifier": df_sentences.iloc[row["sentenceNumber"]]["unique_identifier"],
-                    "text": df_sentences.iloc[row["sentenceNumber"]]["text"],
-                    "sentence_length": df_sentences.iloc[row["sentenceNumber"]]["sentence_length"],
-                    "sentence_type": df_sentences.iloc[row["sentenceNumber"]]["sentence_type"],
+                    "unique_identifier": df_sentences.loc[row["sentenceNumber"]]["unique_identifier"],
+                    "text": df_sentences.loc[row["sentenceNumber"]]["text"],
+                    "sentence_length": df_sentences.loc[row["sentenceNumber"]]["sentence_length"],
+                    "sentence_type": df_sentences.loc[row["sentenceNumber"]]["sentence_type"],
                 }
                 df_final = df_final.append(myrow, ignore_index=True)
             dfs.append(df_final)
 
         df_final = pd.concat(dfs)
-
         # keep only assigned sentences
         if assigned_only:
             # only use assigned sentences
@@ -273,9 +272,13 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
         csv_path = os.path.join(output_wavs_dir, "final.csv")
 
         df_final.to_csv(csv_path, index=False)
+        app_logger.info(f"Saved the csv file in {csv_path}")
+        whisper_model.unload()
         return output_wavs_dir, csv_path
 
     except Exception as e:
         app_logger.error(f"Error in aligning {filename}: {e}")
+        app_logger.error(traceback.format_exc())
         shutil.rmtree(output_wavs_dir)
+        whisper_model.unload()
         return None

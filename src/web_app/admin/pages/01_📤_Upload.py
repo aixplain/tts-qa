@@ -154,6 +154,7 @@ def app():
                                 end_id = re.findall(end_id_regex, example_name)
                                 if start_id and end_id:
                                     st.success("Regex is valid")
+                                    st.write(f"Start ID: {int(start_id[0])} - End ID: {int(end_id[0])}")
                                 else:
                                     st.error("Regex is invalid")
 
@@ -180,6 +181,20 @@ def app():
                             # get all wav files in temp directory
                             # pdb.set_trace()
                             wav_files = glob(os.path.join(temp_dir, "**", "*.wav"), recursive=True)
+
+                            # create a folder of the wavs in one directory and rename them to their unique identifier
+
+                            tempdir_aggregated = tempfile.mkdtemp()
+                            for wav_file in wav_files:
+                                # move the wav file to the temp dir
+                                shutil.move(wav_file, tempdir_aggregated)
+                            # get all wav files in temp directory
+                            wav_files = glob(os.path.join(tempdir_aggregated, "**", "*.wav"), recursive=True)
+
+                            # remove old temp dir
+                            shutil.rmtree(temp_dir)
+
+                            temp_dir = tempdir_aggregated
 
                             # create a dataframe with the wav files
                             wav_df = pd.DataFrame(wav_files, columns=["local_path"])
@@ -212,7 +227,9 @@ def app():
                                     "csv_path": csv_dir,
                                     "deliverable": None if deliverable == "" else deliverable,
                                 }
-                                response = requests.get(BACKEND_URL + "/datasets/{}/upload_segmented".format(st.session_state["dataset"]["id"]), params=params)
+                                response = requests.get(
+                                    BACKEND_URL + "/datasets/{}/upload_segmented_async".format(st.session_state["dataset"]["id"]), params=params
+                                )
                                 if response.status_code == 200:
                                     st.session_state["job_id"] = response.json()["job_id"]
                                     st.success("Files upload triggered successfully")
@@ -231,7 +248,7 @@ def app():
                                     "end_id_regex": end_id_regex,
                                 }
                                 response = requests.get(
-                                    BACKEND_URL + "/datasets/{}/upload_unsegmented".format(st.session_state["dataset"]["id"]), params=params
+                                    BACKEND_URL + "/datasets/{}/upload_unsegmented_async".format(st.session_state["dataset"]["id"]), params=params
                                 )
                                 if response.status_code == 200:
                                     st.session_state["job_id"] = response.json()["job_id"]
@@ -244,7 +261,7 @@ def app():
                     # if st.session_state["job_id"] is not None and st.button("Check Status"):
                     #     progress_bar = st.progress(0)
                     #     job_id = st.session_state["job_id"]
-                    #     response = requests.get(BACKEND_URL + f"/datasets/upload_segmented_status/{job_id}")
+                    #     response = requests.get(BACKEND_URL + f"/datasets/upload_segmented_async_status/{job_id}")
                     #     if response.status_code == 200:
                     #         # {"status": job.state, "progress": progress, "onboarded_samples": job.info.get("onboarded_samples", 0), "failed_samples": job.info.get("failed_samples", [])}
                     #         response_json = response.json()

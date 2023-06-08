@@ -805,12 +805,13 @@ def upload_wav_samples(job: Task, session_: Session, dataset_id: int, csv_path: 
             with ThreadPoolExecutor(max_workers=10) as executor:
                 future = executor.submit(upload_file, session_, row, dataset_id, filename, s3, bucket_name, deliverable)
                 future.result()
-            job.update_state(state="PROGRESS", meta={"progress": percentage, "onboarded_samples": progress.n - len(failed), "failed_samples": failed})
+            if job:
+                job.update_state(state="PROGRESS", meta={"progress": percentage, "onboarded_samples": progress.n - len(failed), "failed_samples": failed})
         except Exception as e:
             app_logger.error(f"POSTGRES: Error uploading sample {row['file_name']}: {e}")
             failed.append(row["file_name"])
-            job.update_state(state="PROGRESS", meta={"progress": percentage, "onboarded_samples": progress.n - len(failed), "failed_samples": failed})
-
+            if job:
+                job.update_state(state="PROGRESS", meta={"progress": percentage, "onboarded_samples": progress.n - len(failed), "failed_samples": failed})
             continue
     progress.close()
     # remove folder that contains csv file

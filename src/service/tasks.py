@@ -65,7 +65,30 @@ def unsegmented_onboarding_job(
     shutil.rmtree(wavs_path, ignore_errors=True)
     shutil.rmtree(csv_path, ignore_errors=True)
 
-    app_logger.debug(f"aligned_wavs_dirh: {aligned_wavs_dir}")
+    app_logger.debug(f"aligned_wavs_dir: {aligned_wavs_dir}")
 
     # Simulate a long-running job
     upload_wav_samples(self, session, dataset_id, aligned_csv_path, deliverable=deliverable)
+
+
+def unsegmented_onboarding_job_sync(
+    dataset_id: int, language: str, wavs_path: str, csv_path: str, start_id_regex: str, end_id_regex: str, deliverable: str = None
+):
+
+    app_logger.info("Starting unsegmented onboarding job")
+
+    app_logger.info(f"dataset_id: {dataset_id}")
+    app_logger.info(f"wavs_path: {wavs_path}")
+    app_logger.info(f"csv_path: {csv_path}")
+    app_logger.info(f"deliverable: {deliverable}")
+    # do alignment first and then upload
+    aligned_wavs_dir, aligned_csv_path = align_wavs(None, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+
+    # TODO: make sure that you keep the aligned csv
+    shutil.rmtree(wavs_path, ignore_errors=True)
+    shutil.rmtree(csv_path, ignore_errors=True)
+
+    app_logger.debug(f"aligned_wavs_dirh: {aligned_wavs_dir}")
+
+    # Simulate a long-running job
+    upload_wav_samples(None, session, dataset_id, aligned_csv_path, deliverable=deliverable)

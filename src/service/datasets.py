@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from typing import List, Union
 
 from fastapi import APIRouter
@@ -112,10 +113,10 @@ def handle_exceptions(task: asyncio.Task):
         print(f"An error occurred in the task: {task.exception()}")
 
 
-from src.service.tasks import segmented_onboarding_job, unsegmented_onboarding_job
+from src.service.tasks import segmented_onboarding_job, unsegmented_onboarding_job, unsegmented_onboarding_job_sync
 
 
-@router.get("/{id}/upload_segmented")
+@router.get("/{id}/upload_segmented_async")
 def upload_segmented(id, csv_path: str, deliverable: str = None):
     job = segmented_onboarding_job.delay(dataset_id=id, csv_path=csv_path, deliverable=deliverable)
     return {"job_id": job.id}
@@ -140,8 +141,8 @@ def check_job_status(job_id: str):
     }
 
 
-@router.get("/{id}/upload_unsegmented")
-def upload_unsegmented(id, wavs_path: str, csv_path: str, start_id_regex: str, end_id_regex: str, deliverable: str = None):
+@router.get("/{id}/upload_unsegmented_async")
+def upload_unsegmented_async(id, wavs_path: str, csv_path: str, start_id_regex: str, end_id_regex: str, deliverable: str = None):
     # get dataset language
     dataset = db_utils.get_dataset_by_id(id)
     job = unsegmented_onboarding_job.delay(
@@ -154,3 +155,24 @@ def upload_unsegmented(id, wavs_path: str, csv_path: str, start_id_regex: str, e
         deliverable=deliverable,
     )
     return {"job_id": job.id}
+
+
+@router.get("/{id}/upload_unsegmented_sync")
+def upload_unsegmented_sync(id, wavs_path: str, csv_path: str, start_id_regex: str, end_id_regex: str, deliverable: str = None):
+    # get dataset language
+
+    dataset = db_utils.get_dataset_by_id(id)
+    try:
+        unsegmented_onboarding_job_sync(
+            dataset_id=id,
+            language=dataset.language,
+            wavs_path=wavs_path,
+            csv_path=csv_path,
+            start_id_regex=start_id_regex,
+            end_id_regex=end_id_regex,
+            deliverable=deliverable,
+        )
+        return {"message": "Success"}
+    except Exception as e:
+        app_logger.error(f"{traceback.format_exc()}")
+        return {"message": "Failed", "error": str(e)}
