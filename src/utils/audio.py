@@ -1,4 +1,7 @@
 import os
+
+
+os.environ["TEAM_API_KEY"] = "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8"
 import time
 
 import librosa
@@ -27,27 +30,27 @@ vad_pipeline.instantiate(HYPER_PARAMETERS)
 
 api_keys = {
     "en": {
-        "api_key": "66c4c7ad2eb5620207e8ee6a3a5799d5100c9798d8d64206965ca519db5f5f24",
+        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc378",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc378"),
     },
     "es": {
-        "api_key": "66c4c7ad2eb5620207e8ee6a3a5799d5100c9798d8d64206965ca519db5f5f24",
+        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc375",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc375"),
     },
     "fr": {
-        "api_key": "66c4c7ad2eb5620207e8ee6a3a5799d5100c9798d8d64206965ca519db5f5f24",
+        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc389",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc389"),
     },
     "it": {
-        "api_key": "66c4c7ad2eb5620207e8ee6a3a5799d5100c9798d8d64206965ca519db5f5f24",
+        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc353",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc353"),
     },
     "de": {
-        "api_key": "66c4c7ad2eb5620207e8ee6a3a5799d5100c9798d8d64206965ca519db5f5f24",
+        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc334",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc334"),
     },

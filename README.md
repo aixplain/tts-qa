@@ -9,7 +9,7 @@ bash docker-compose.sh start
 
 ## Start Celery
 ```
-celery -A src.service.tasks worker --loglevel=info
+celery -A src.service.tasks worker --loglevel=info --pool=threads
 ```
 ## Start Backend
 ```
@@ -73,6 +73,7 @@ Sum of the duration of all the samples for each dataset.language
 SELECT dataset.language as dataset_name, ROUND(SUM(sample.trimmed_audio_duration) / 60, 2)   AS minutes, ROUND(SUM(sample.trimmed_audio_duration) / 3600, 2)   AS hours
 FROM sample
 JOIN dataset ON sample.dataset_id = dataset.id
+WHERE dataset.name NOT LIKE '%English (A%'
 GROUP BY dataset.language
 ORDER BY dataset.language;
 ```

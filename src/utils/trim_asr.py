@@ -1,4 +1,8 @@
 import os
+
+
+os.environ["TEAM_API_KEY"] = "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8"
+
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -20,6 +24,9 @@ from src.utils.audio import asr_and_trim, trim_audio, trim_only
 
 
 app_logger = root_logger.getChild("trimmer")
+
+# set logging level to info
+app_logger.setLevel("INFO")
 
 BASE_DIR = paths.PROJECT_ROOT_DIR
 
@@ -115,6 +122,7 @@ def process_datasets():
                     if sample.asr_text is None:
                         executor.submit(asr_and_trim_, session, sample, language)
                     else:
+                        app_logger.error(f"Sample {sample.id} already has asr_text")
                         executor.submit(trim_only_, session, sample, language)
 
             # get samples with asr_text = null
