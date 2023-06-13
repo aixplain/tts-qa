@@ -5,7 +5,7 @@ from typing import List, Union
 from fastapi import APIRouter
 
 from src.logger import root_logger
-from src.service.bases import AnnotatorModel, DatasetModel, InfoModel, SampleModel  # noqa: F401
+from src.service.bases import AnnotationModel, AnnotatorModel, DatasetModel, InfoModel, SampleModel  # noqa: F401
 from src.utils import db_utils
 
 
@@ -106,6 +106,16 @@ def query_next_sample(id: int) -> dict:
         return {"sample": SampleModel(**sample.to_dict()), "stats": stats}  # type: ignore
     except Exception as e:
         return {"message": "Failed", "error": str(e)}
+
+
+# get the annotations of dataset samples
+@router.get("/{id}/annotations")
+def get_annotations_of_dataset(id: int) -> Union[List[dict], InfoModel]:
+    try:
+        annotations = db_utils.get_annotations_of_dataset(id)
+        return [annotation for annotation in annotations]
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})
 
 
 def handle_exceptions(task: asyncio.Task):

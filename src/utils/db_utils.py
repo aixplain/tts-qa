@@ -201,6 +201,50 @@ def get_annotators_of_dataset(id: int) -> List[Annotator]:
     return annotators
 
 
+def get_annotations_of_dataset(id: int) -> List[dict]:
+    # need to join samples, annotations, annotators. it should return annotation and together with annotater name
+    app_logger.debug(f"POSTGRES: Getting annotations of dataset {id}")
+    with db.session.begin():
+        # check if the dataset exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {id} does not exist")
+        # join annotator and annotation and only get annotations of samples of this dataset
+        # for each annotation also append the annotator name by joining on annotator_id
+        results = (
+            session.query(Annotation, Annotator, Sample)
+            .join(Sample, Annotation.sample_id == Sample.id)
+            .join(Annotator, Annotation.annotator_id == Annotator.id)
+            .filter(Sample.dataset_id == id)
+        )
+        results = results.all()
+        # Process the results and create a list of dictionaries
+        annotations_list = []
+        for annotation, annotator, sample in results:
+            annotation_dict = {
+                "id": annotation.id,
+                "sample_id": annotation.sample_id,
+                "annotator_id": annotation.annotator_id,
+                "created_at": str(annotation.created_at),
+                "final_text": annotation.final_text,
+                "isAccentRight": annotation.isAccentRight,
+                "isClean": annotation.isClean,
+                "isSpeedRight": annotation.isSpeedRight,
+                "feedback": annotation.feedback,
+                "status": annotation.status,
+                "final_sentence_type": annotation.final_sentence_type,
+                "isPronunciationRight": annotation.isPronunciationRight,
+                "isPausesRight": annotation.isPausesRight,
+                "isConsisent": annotation.isConsisent,
+                "annotator_name": annotator.name,
+                "filename": sample.filename,
+                "original_text": sample.original_text,
+            }
+            annotations_list.append(annotation_dict)
+
+    return annotations_list
+
+
 ########################
 #### ANNOTATOR UTILS ###
 ########################
@@ -441,6 +485,24 @@ def update_annotator(id: int, **kwargs) -> None:
         db.session.commit()
         # return the updated annotator
         annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
+
+
+########################
+## ANNOTATIONS UTILS ###
+########################
+
+
+def list_annotations() -> List[Annotation]:
+    """List all annotations.
+
+    Returns:
+        List[Annotation]: The list of annotations.
+    """
+    app_logger.debug(f"POSTGRES: Listing annotations")
+    with db.session.begin():
+        annotations = db.session.query(Annotation).all()
+        db.session.commit()
+    return annotations
 
 
 ########################

@@ -36,7 +36,7 @@ python -m streamlit run ./src/web_app/admin/🏠_Intro_admin.py  --server.maxUpl
 ```bash
 docker exec -t postgres_container_prod pg_dump -U postgres  prod_tts_db > dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
 
-cat dump_14-04-2023_19_51_42.sql | docker exec -i postgres_container_prod  psql -U postgres prod_tts_db
+cat dump_11-06-2023_17_31_38.sql | docker exec -i postgres_container_prod  psql -U postgres prod_tts_db
 
 ```
 

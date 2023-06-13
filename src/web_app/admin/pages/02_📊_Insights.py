@@ -4,6 +4,8 @@
 import os
 import sys
 
+import plotly.express as px
+import plotly.figure_factory as ff
 import requests
 import streamlit as st
 
@@ -28,7 +30,6 @@ BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.ge
 
 
 import matplotlib.pyplot as plt
-import seaborn as sns
 from wordcloud import WordCloud  # noqa: F401
 
 
@@ -119,42 +120,54 @@ def app():
 
     if selected_dataset:
         selected_dataset = [dataset for dataset in datasets if dataset["name"] == selected_dataset][0]
-        st.subheader(f"Dataset Information for {selected_dataset['name']}")
-        display_json(selected_dataset)
-
         samples = pd.DataFrame(get_samples(selected_dataset["id"]))
-        # annotations = pd.DataFrame(get_annotations(selected_dataset["id"]))
+        annotations = pd.DataFrame(get_annotations(selected_dataset["id"]))
         annotators = pd.DataFrame(get_annotators(selected_dataset["id"]))
-        # feedbacks = pd.DataFrame(get_feedback(selected_dataset["id"]))
 
-        st.subheader("Annotator Information")
-        display_json(annotators)
+        col1, col2 = st.columns((5, 10))
+        with col1:
+            st.subheader(f"Dataset Information")
+            display_json(selected_dataset)
+
+        with col2:
+            st.subheader("Annotator Information")
+            display_json(annotators)
+
+        st.markdown("---")
 
         st.subheader("Sample Information")
         display_json(samples)
 
-        st.subheader("Histogram: Sample Duration")
-        fig, ax = plt.subplots()
-        sns.histplot(samples["duration"], ax=ax, bins=30)
-        st.pyplot(fig)
+        col1, col2 = st.columns((1, 1))
+        with col1:
+            st.subheader("Histogram: Sample Duration")
+            fig = ff.create_distplot([samples["duration"]], ["duration"])
+            st.plotly_chart(fig)
 
-        # st.subheader("Annotation Information")
-        # st.dataframe(annotations)
+        if len(annotations) > 0:
+            st.subheader("Annotation Information")
+            st.dataframe(annotations)
 
-        # st.subheader("Histogram: Annotation Status")
-        # fig, ax = plt.subplots()
-        # sns.histplot(annotations["status"], ax=ax)
-        # st.pyplot(fig)
+            st.subheader("Histogram: Annotation Status")
+            fig = px.histogram(annotations, x="status")
+            st.plotly_chart(fig)
 
-        # st.subheader("Annotation Text Comparison")
-        # comparison_table = annotations[["sample_id", "original_text", "final_text", "wer"]]
-        # st.dataframe(comparison_table)
+            st.subheader("Histogram: Annotators")
+            fig = px.histogram(annotations, x="annotator_name")
+            st.plotly_chart(fig)
 
-        # st.subheader("Feedback Analysis")
-        # wordcloud = WordCloud(background_color='white').generate(' '.join(feedbacks["text"]))
-        # plt.imshow(wordcloud, interpolation='bilinear')
-        # plt.axis("off")
-        # plt.show()
+            st.subheader("Annotation Text Comparison")
+            comparison_table = annotations[["filename", "original_text", "final_text"]]
+            st.dataframe(comparison_table)
+
+            st.subheader("Feedback Analysis")
+            wordcloud = WordCloud(background_color="white").generate(" ".join(annotations["feedback"].dropna()))
+            fig, ax = plt.subplots()
+            ax.imshow(wordcloud, interpolation="bilinear")
+            ax.axis("off")
+            st.pyplot(fig)
+        else:
+            st.warning("No annotations found for this dataset")
 
         # st.subheader("Annotation Trends over Time")
         # annotations["date"] = pd.to_datetime(annotations["date"])
