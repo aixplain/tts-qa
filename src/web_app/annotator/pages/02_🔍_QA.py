@@ -81,6 +81,7 @@ def app():
         st.session_state["user_input"] = {
             "final_text": "",
             "final_sentence_type": "statement",
+            "isRepeated": False,
             "isAccentRight": False,
             "isPronunciationRight": False,
             "isClean": False,
@@ -126,6 +127,7 @@ def app():
         annotator_id: int,
         final_text: str,
         final_sentence_type: str,
+        isRepeated: bool,
         isAccentRight: bool,
         isPronunciationRight: bool,
         isClean: bool,
@@ -140,6 +142,7 @@ def app():
             "annotator_id": annotator_id,
             "final_text": final_text,
             "final_sentence_type": final_sentence_type,
+            "isRepeated": isRepeated,
             "isAccentRight": isAccentRight,
             "isPronunciationRight": isPronunciationRight,
             "isClean": isClean,
@@ -180,6 +183,7 @@ def app():
                 st.session_state["user_input"] = {
                     "final_text": sample["final_text"],
                     "final_sentence_type": sample["sentence_type"],
+                    "isRepeated": False,
                     "isAccentRight": False,
                     "isPronunciationRight": False,
                     "isClean": False,
@@ -297,6 +301,7 @@ def app():
             if discard:
                 col1, col2 = st.columns(2)
                 with col1:
+                    isRepeated = True if st.checkbox("Has Repeation", value=False) else False
                     isAccentRight = True if st.checkbox("Accent is Wrong", value=False) else False
                     isPronunciationRight = True if st.checkbox("Pronunciation is Wrong", value=False) else False
                     isClean = True if st.checkbox("Recording is not Clean", value=False) else False
@@ -306,6 +311,7 @@ def app():
                 with col2:
                     feedback = st.text_area("Feedback", value=st.session_state["user_input"]["feedback"])
 
+                st.session_state["user_input"]["isRepeated"] = isRepeated
                 st.session_state["user_input"]["isAccentRight"] = isAccentRight
                 st.session_state["user_input"]["isPronunciationRight"] = isPronunciationRight
                 st.session_state["user_input"]["isClean"] = isClean
@@ -314,6 +320,7 @@ def app():
                 st.session_state["user_input"]["isConsisent"] = isConsisent
                 st.session_state["user_input"]["feedback"] = feedback
             else:
+                st.session_state["user_input"]["isRepeated"] = True
                 st.session_state["user_input"]["isAccentRight"] = True
                 st.session_state["user_input"]["isPronunciationRight"] = True
                 st.session_state["user_input"]["isClean"] = True

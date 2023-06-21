@@ -27,6 +27,20 @@ BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
 # load the .env file
 load_dotenv(os.path.join(BASE_DIR, "vars.env"))
 
+
+def run_regex(wav_files, start_id_regex, end_id_regex):
+    failed_files = []
+    for wav_file in wav_files:
+        start_id = re.findall(start_id_regex, wav_file)
+        end_id = re.findall(end_id_regex, wav_file)
+        if start_id and end_id:
+            start_id = int(start_id[0])
+            end_id = int(end_id[0])
+        else:
+            failed_files.append(wav_file)
+    return wav_files, failed_files
+
+
 lang_map = {
     "English": "en",
     "German": "de",
@@ -182,6 +196,13 @@ def app():
                             # pdb.set_trace()
                             wav_files = glob(os.path.join(temp_dir, "**", "*.wav"), recursive=True)
 
+                            # run regex for detection of start and end id for each wav file and the failed ones will be added to a list
+                            if not segmented:
+                                wav_files, st.session_state["failed_files"] = run_regex(wav_files, start_id_regex, end_id_regex)
+                                if len(st.session_state["failed_files"]) > 0:
+                                    st.error("Some files could not be processed")
+                                    st.write(st.session_state["failed_files"])
+
                             # create a folder of the wavs in one directory and rename them to their unique identifier
 
                             tempdir_aggregated = tempfile.mkdtemp()
@@ -238,26 +259,28 @@ def app():
                                     # remove temp_dir
                                     shutil.rmtree(temp_dir, ignore_errors=True)
                             else:
-                                csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
-                                csv.to_csv(csv_dir, index=False)
-                                params = {
-                                    "wavs_path": temp_dir,
-                                    "csv_path": csv_dir,
-                                    "deliverable": None if deliverable == "" else deliverable,
-                                    "start_id_regex": start_id_regex,
-                                    "end_id_regex": end_id_regex,
-                                }
-                                response = requests.get(
-                                    BACKEND_URL + "/datasets/{}/upload_unsegmented_async".format(st.session_state["dataset"]["id"]), params=params
-                                )
-                                if response.status_code == 200:
-                                    st.session_state["job_id"] = response.json()["job_id"]
-                                    st.success("Files upload triggered successfully")
+                                if not len(st.session_state["failed_files"]) > 0:
+                                    csv_dir = os.path.join(temp_dir, f"{uploaded_file.name}")
+                                    csv.to_csv(csv_dir, index=False)
+                                    params = {
+                                        "wavs_path": temp_dir,
+                                        "csv_path": csv_dir,
+                                        "deliverable": None if deliverable == "" else deliverable,
+                                        "start_id_regex": start_id_regex,
+                                        "end_id_regex": end_id_regex,
+                                    }
+                                    response = requests.get(
+                                        BACKEND_URL + "/datasets/{}/upload_unsegmented_async".format(st.session_state["dataset"]["id"]), params=params
+                                    )
+                                    if response.status_code == 200:
+                                        st.session_state["job_id"] = response.json()["job_id"]
+                                        st.success("Files upload triggered successfully")
+                                    else:
+                                        st.error("An error occured while uploading the files")
+                                        # remove temp_dir
+                                        shutil.rmtree(temp_dir, ignore_errors=True)
                                 else:
-                                    st.error("An error occured while uploading the files")
-                                    # remove temp_dir
-                                    shutil.rmtree(temp_dir, ignore_errors=True)
-
+                                    st.error("Please fix the errors before uploading the files")
                     # if st.session_state["job_id"] is not None and st.button("Check Status"):
                     #     progress_bar = st.progress(0)
                     #     job_id = st.session_state["job_id"]

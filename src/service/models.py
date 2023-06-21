@@ -152,6 +152,7 @@ class Annotation(Base):  # type: ignore
     status = Column(Enum(Status), default=Status.NotReviewed)
     final_text = Column(String(250), unique=False, nullable=True)
     final_sentence_type = Column(String(50), unique=False, nullable=True)
+    isRepeated = Column(Boolean, default=None, nullable=True)
     isAccentRight = Column(Boolean, default=None, nullable=True)
     isPronunciationRight = Column(Boolean, default=None, nullable=True)
     isClean = Column(Boolean, default=None, nullable=True)
@@ -176,6 +177,7 @@ class Annotation(Base):  # type: ignore
             "status": self.status,
             "final_text": self.final_text,
             "final_sentence_type": self.final_sentence_type,
+            "isRepeated": self.isRepeated,
             "isAccentRight": self.isAccentRight,
             "isPronunciationRight": self.isPronunciationRight,
             "isClean": self.isClean,
