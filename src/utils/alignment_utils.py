@@ -1,6 +1,5 @@
 import json
 import os
-import pickle
 import re
 import shutil
 import tempfile
@@ -11,15 +10,13 @@ from typing import Tuple
 import editdistance
 import numpy as np
 import pandas as pd
+import whisper_timestamped as whisperts
 from celery import Task
-from pyannote.audio import Model
-from pyannote.audio.pipelines import VoiceActivityDetection
 from pydub import AudioSegment
 from tqdm import tqdm
 
 from src.logger import root_logger
 from src.utils.audio import trim_audio
-from src.utils.whisper_model import WhisperASR
 
 
 app_logger = root_logger.getChild("alignment_utils")
@@ -33,37 +30,12 @@ def format_int(i):
     return str(i).zfill(8)
 
 
-modelPyannote = Model.from_pretrained("pyannote/segmentation", use_auth_token="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")
-
-pipeline = VoiceActivityDetection(segmentation=modelPyannote)
-HYPER_PARAMETERS = {
-    # onset/offset activation thresholds
-    "onset": 0.5,
-    "offset": 0.5,
-    # remove speech regions shorter than that many seconds.
-    "min_duration_on": 0.0,
-    # fill non-speech regions shorter than that many seconds.
-    "min_duration_off": 0.05,
-}
-pipeline.instantiate(HYPER_PARAMETERS)
 padding = 0.25
 
 
-lang_map = {
-    "en": "english",
-    "fr": "french",
-    "es": "spanish",
-    "de": "german",
-    "it": "italian",
-}
-
-whisper_model = WhisperASR(model_size="large-v2", language="english")
-
-
 def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id_regex: str, end_id_regex: str, assigned_only: bool = True) -> Tuple[str, str]:
-    whisper_model.load(language=lang_map[language])
+    whisper_model = whisperts.load_model("large-v2", device="cuda")
     app_logger.info(f"wav_path: {wavs_path}")
-
     filenames = glob(os.path.join(wavs_path, "*.wav"))
     app_logger.info(f"Found {len(filenames)} wav files")
 
@@ -77,26 +49,23 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
         dfs = []
         for filename in filenames:
             app_logger.info(f"Processing {filename}")
-            vad_path = os.path.join(temp_dir, filename + ".vad.bin")
-            if os.path.exists(vad_path):
-                app_logger.info(f"Detected VAD for {filename}  at {vad_path}- loading from file")
-                vad = pickle.load(open(vad_path, "rb"))
+            segments_path = filename + ".vad-segments.json"
+            if os.path.exists(segments_path):
+                app_logger.info(f"Detected segments file {filename}")
+                vad_segments = json.load(open(segments_path))
             else:
-                app_logger.info(f"Running VAD for {filename}")
-                try:
-                    vad = pipeline(filename)
-                except Exception as e:
-                    app_logger.error(f"Failed to run VAD for {filename}")
-                    app_logger.error(e)
-                    continue
-                app_logger.info(f"finished VAD for {filename}")
-                i = 0
-                app_logger.info(f"Saving VAD for {filename}")
-                with open(vad_path, "wb") as f:
-                    pickle.dump(vad, f)
-                app_logger.info(f"Saved VAD for {filename}")
+                app_logger.info(f"Generating segments file {filename}")
+                audio = whisperts.load_audio(filename)
+                results = whisperts.transcribe(whisper_model, audio, vad=True, detect_disfluencies=False, language=language)
+                vad_segments = results["segments"]
+
+                app_logger.info(f"Saving segments for {filename}")
+                with open(segments_path, "w") as f:
+                    json.dump(vad_segments, f)
+                app_logger.info(f"Saved segments for {filename} to {segments_path}")
 
             data = AudioSegment.from_file(filename)
+
             start_loc = int(re.search(start_id_regex, filename).group(1))
             end_loc = int(re.search(end_id_regex, filename).group(1))
 
@@ -131,28 +100,22 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
                 segments = json.load(open(segments_path))
             else:
                 app_logger.info(f"Running ASR for {filename}")
-                timeline = vad.get_timeline().support()
-                for segment in tqdm(timeline):
-                    start, end = list(segment)
+                for segment in tqdm(vad_segments):
+                    start = segment["start"]
+                    end = segment["end"]
+                    text = segment["text"]
+
                     start = max(0, start - padding)
                     end = min(end + padding, len(data) / 1000)
                     seg = {}
                     seg["SegmentStart"] = start
                     seg["SegmentEnd"] = end
+                    seg["asr"] = text
                     outputAudio = AudioSegment.empty()
                     outputAudio += data[seg["SegmentStart"] * 1000 : seg["SegmentEnd"] * 1000]
                     # save audio to a tmp file
                     temp_file = os.path.join(temp_dir, "tmp.wav")
                     outputAudio.export(temp_file, format="wav")
-                    # run ASR
-                    try:
-                        result = whisper_model.predict({"instances": [{"url": temp_file}]})
-                        asr = result["predictions"][0]
-                        seg["asr"] = asr
-                    except:
-                        app_logger.error(f"Failed to run ASR for {filename}")
-                        seg["asr"] = ""
-                        pass
                     segments[start] = seg
                 # save segments
                 print(f"Saving segments for {filename}")

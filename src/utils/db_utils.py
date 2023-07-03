@@ -666,7 +666,7 @@ def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
             .outerjoin(Annotation, Sample.id == Annotation.sample_id)
             .filter(Sample.dataset_id == dataset_id)
             .filter(Sample.wer > 0.2)
-            .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.05 * func.length(Sample.original_text))
+            .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.02 * func.length(Sample.original_text))
             .filter(
                 not_(
                     (Sample.local_trimmed_path == None)

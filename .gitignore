@@ -16,6 +16,7 @@
 **/*.tif
 **/*.tiff
 **/*.pth
+**/*.zip
 **/exec_spec*
 backend/xview2/
 # ignore weights

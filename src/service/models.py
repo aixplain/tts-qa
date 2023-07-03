@@ -198,8 +198,8 @@ class Dataset(Base):  # type: ignore
     language = Column(String(5), unique=False, nullable=False)
     description = Column(String(250), unique=False, nullable=True)
     created_at = Column(DateTime, default=func.now())
-    samples = relationship("Sample", cascade="all, delete", backref="dataset")
 
+    samples = relationship("Sample", cascade="all, delete", backref="dataset")
     annotators = relationship("Annotator", secondary=annotator_dataset, backref=backref("assigned_datasets", passive_deletes=True))
 
     __table_args__ = (UniqueConstraint("name", name="_name_uc"),)
