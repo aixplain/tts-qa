@@ -236,12 +236,12 @@ def align_wavs(job: Task, wavs_path: str, csv_path: str, language: str, start_id
 
         df_final.to_csv(csv_path, index=False)
         app_logger.info(f"Saved the csv file in {csv_path}")
-        whisper_model.unload()
+        del whisper_model
         return output_wavs_dir, csv_path
 
     except Exception as e:
         app_logger.error(f"Error in aligning {filename}: {e}")
         app_logger.error(traceback.format_exc())
         shutil.rmtree(output_wavs_dir)
-        whisper_model.unload()
+        del whisper_model
         return None
