@@ -16,8 +16,6 @@ celery -A src.service.tasks worker --loglevel=info --pool=threads
 uvicorn src.service.api:app --port 8089 --reload
 ```
 
-
-
 ## Start Frontend
 ### 1. Annotator
 ```
@@ -34,7 +32,7 @@ python -m streamlit run ./src/web_app/admin/🏠_Intro_admin.py  --server.maxUpl
 ### How to dupp and restore the database
 
 ```bash
-docker exec -t postgres_container_prod pg_dump -U postgres  prod_tts_db > dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
+docker exec -t postgres_container_prod pg_dump -U postgres  prod_tts_db > dump_`date +%Y-%m-%d"_"%H_%M_%S`.sql
 
 cat dump_11-06-2023_17_31_38.sql | docker exec -i postgres_container_prod  psql -U postgres prod_tts_db
 

@@ -24,7 +24,7 @@ from src.logger import root_logger
 from src.paths import paths
 from src.service.models import Annotation, Annotator, Base, Dataset, Sample  # noqa: F401
 from src.utils import utils
-from src.utils.audio import asr_and_trim, trim_audio, trim_only
+from src.utils.audio import asr_and_trim_aws, asr_and_trim_azure, trim_audio, trim_only
 
 
 app_logger = root_logger.getChild("trimmer")
@@ -50,12 +50,17 @@ s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), a
 bucket_name = os.environ.get("S3_BUCKET_NAME")
 dataset_dir = os.environ.get("S3_DATASET_DIR")
 
+offset = 0.20
 
-def asr_and_trim_(session_, sample, language):
-    response = asr_and_trim(sample.s3RawPath, language)
+
+def asr_and_trim_(session_, sample, language, use="azure"):
+    if use == "azure":
+        response = asr_and_trim_azure(sample.s3RawPath, language)
+    elif use == "aws":
+        response = asr_and_trim_aws(sample.s3RawPath, language)
     sample.asr_text = str(response["asr_text"])
-    sample.trim_start = round(float(response["trim_start"]), 2)
-    sample.trim_end = round(float(response["trim_end"]), 2)
+    sample.trim_start = round(float(response["trim_start"]), 2) - offset
+    sample.trim_end = round(float(response["trim_end"]), 2) + offset
     sample.trimmed_audio_duration = round(float(response["trimmed_audio_duration"]), 2)
     sample.longest_pause = round(float(response["longest_pause"]), 2)
     sample.wer = round(float(utils.calculate_wer(sample.original_text, sample.asr_text)), 2)
@@ -122,11 +127,11 @@ def process_datasets():
             with ThreadPoolExecutor(max_workers=10) as executor:
                 for sample in samples:
                     if sample.asr_text is None:
-                        executor.submit(asr_and_trim_, session, sample, language)
+                        executor.submit(asr_and_trim_, session, sample, language, "aws")
                     else:
                         app_logger.error(f"Sample {sample.id} already has asr_text")
                         # executor.submit(trim_only_, session, sample, language)
-                        executor.submit(asr_and_trim_, session, sample, language)
+                        executor.submit(asr_and_trim_, session, sample, language, "aws")
 
             # get samples with asr_text = null
             samples = (
