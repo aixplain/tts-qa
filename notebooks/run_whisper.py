@@ -8,9 +8,9 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-from src.features.whisper_model import WhisperASR
 from src.logger import root_logger
 from src.paths import paths
+from src.utils.whisper_model import WhisperTimestampedASR
 
 
 logger = root_logger.getChild(__name__)
@@ -27,7 +27,7 @@ if __name__ == "__main__":
                 model_size = model_size + ".en"
 
             logger.info(f"Loading model {model_size} for {language}")
-            model = WhisperASR(model_size=model_size, language=language)
+            model = WhisperTimestampedASR(model_size=model_size, language=language)
             model.load()
             save_dir = paths.FEATURES_DATASETS_DIR / f"whisper_{language}_{model_size}"
             if not save_dir.exists():

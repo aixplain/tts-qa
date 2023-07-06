@@ -58,13 +58,18 @@ def asr_and_trim_(session_, sample, language, use="azure"):
         response = asr_and_trim_azure(sample.s3RawPath, language)
     elif use == "aws":
         response = asr_and_trim_aws(sample.s3RawPath, language)
-    sample.asr_text = str(response["asr_text"])
-    sample.trim_start = round(float(response["trim_start"]), 2) - offset
-    sample.trim_end = round(float(response["trim_end"]), 2) + offset
-    sample.trimmed_audio_duration = round(float(response["trimmed_audio_duration"]), 2)
+
+    start = float(response["trim_start"]) - offset
+    end = float(response["trim_end"]) + offset
+    out_path, start, end = trim_audio(sample.local_path, start, end, sample.local_path.replace("raw", "trimmed"))
+
+    sample.trim_start = round(float(start), 2)
+    sample.trim_end = round(float(end), 2)
+    sample.trimmed_audio_duration = round(float(end - start), 2)
     sample.longest_pause = round(float(response["longest_pause"]), 2)
+    sample.asr_text = str(response["asr_text"])
     sample.wer = round(float(utils.calculate_wer(sample.original_text, sample.asr_text)), 2)
-    out_path = trim_audio(sample.local_path, sample.trim_start, sample.trim_end, sample.local_path.replace("raw", "trimmed"))
+
     # update sample
     object_key = out_path.split(f"{str(paths.LOCAL_BUCKET_DIR)}/")[1]
     s3TrimmedPath = f"s3://{bucket_name}/{object_key}"
@@ -78,12 +83,16 @@ def asr_and_trim_(session_, sample, language, use="azure"):
 
 def trim_only_(session_, sample, language):
     response = trim_only(sample.local_path)
-    sample.trim_start = round(float(response["trim_start"]), 2)
-    sample.trim_end = round(float(response["trim_end"]), 2)
-    sample.trimmed_audio_duration = round(float(response["trimmed_audio_duration"]), 2)
+
+    start = float(response["trim_start"]) - offset
+    end = float(response["trim_end"]) + offset
+    out_path, start, end = trim_audio(sample.local_path, sample.trim_start, sample.trim_end, sample.local_path.replace("raw", "trimmed"))
+
+    sample.trim_start = round(float(start), 2)
+    sample.trim_end = round(float(end), 2)
+    sample.trimmed_audio_duration = round(float(end - start), 2)
     sample.longest_pause = round(float(response["longest_pause"]), 2)
     sample.wer = round(float(utils.calculate_wer(sample.original_text, sample.asr_text)), 2)
-    out_path = trim_audio(sample.local_path, sample.trim_start, sample.trim_end, sample.local_path.replace("raw", "trimmed"))
     # update sample
     object_key = out_path.split(f"{str(paths.LOCAL_BUCKET_DIR)}/")[1]
     s3TrimmedPath = f"s3://{bucket_name}/{object_key}"
@@ -124,7 +133,7 @@ def process_datasets():
             #     # get asr_text
             #     postprocess(session, sample, language)
             # do the above as threads
-            with ThreadPoolExecutor(max_workers=10) as executor:
+            with ThreadPoolExecutor(max_workers=16) as executor:
                 for sample in samples:
                     if sample.asr_text is None:
                         executor.submit(asr_and_trim_, session, sample, language, "aws")

@@ -30,7 +30,7 @@ def edit_distance(s1, s2):
     return editdistance.eval(s1, s2)
 
 
-for dataset in ["French", "English", "German", "Italian"]:
+for dataset in ["German(Dorothee)"]:
     print(f"Processing {dataset}")
 
     sql_script = f"""

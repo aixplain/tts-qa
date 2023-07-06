@@ -2,7 +2,11 @@ import json
 import os
 import pickle
 import re
+import sys
 from glob import glob
+
+
+sys.path.append("../")
 
 import editdistance
 import numpy as np
@@ -11,7 +15,8 @@ from pyannote.audio import Model
 from pyannote.audio.pipelines import VoiceActivityDetection
 from pydub import AudioSegment
 from tqdm import tqdm
-from whisper_model import WhisperASR
+
+from src.utils.whisper_model import WhisperTimestampedASR
 
 
 def edit_distance(s1, s2):
@@ -66,7 +71,7 @@ for batch in batches:
         language = "fr"
     elif "German" in batch:
         language = "de"
-    whisper_model = WhisperASR(model_size="large-v2", language=lang_map[language])
+    whisper_model = WhisperTimestampedASR(model_size="large-v2", language=lang_map[language])
     whisper_model.load()
     print(f"Processing batch {batch}")
     filenames = glob(batch + "*.wav")
@@ -244,4 +249,4 @@ for batch in batches:
             else:
                 wav_path = os.path.join(wav_folder, "not_assigned", f"{language.upper()}" + format_int(row["sentenceNumber"]) + ".wav")
 
-            outpath = trim_audio(filename, start, end, wav_path)
+            outpath, start, end = trim_audio(filename, start, end, wav_path)

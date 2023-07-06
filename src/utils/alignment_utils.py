@@ -11,7 +11,6 @@ from typing import Tuple
 import editdistance
 import numpy as np
 import pandas as pd
-import whisper_timestamped as whisperts
 from celery import Task
 from pyannote.audio import Model
 from pyannote.audio.pipelines import VoiceActivityDetection
@@ -20,7 +19,7 @@ from tqdm import tqdm
 
 from src.logger import root_logger
 from src.utils.audio import trim_audio
-from src.utils.whisper_model import WhisperASR
+from src.utils.whisper_model import WhisperTimestampedASR
 
 
 app_logger = root_logger.getChild("alignment_utils")
@@ -34,13 +33,40 @@ def format_int(i):
     return str(i).zfill(8)
 
 
+modelPyannote = Model.from_pretrained("pyannote/segmentation", use_auth_token="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")
+
+pipeline = VoiceActivityDetection(segmentation=modelPyannote)
+HYPER_PARAMETERS = {
+    # onset/offset activation thresholds
+    "onset": 0.5,
+    "offset": 0.5,
+    # remove speech regions shorter than that many seconds.
+    "min_duration_on": 0.0,
+    # fill non-speech regions shorter than that many seconds.
+    "min_duration_off": 0.05,
+}
+pipeline.instantiate(HYPER_PARAMETERS)
+padding = 0.25
+
+
+lang_map = {
+    "en": "english",
+    "fr": "french",
+    "es": "spanish",
+    "de": "german",
+    "it": "italian",
+}
+
+whisper_model = WhisperTimestampedASR(model_size="medium", language="english", device="cuda")
+
+
 padding = 0.25
 
 
 def align_wavs_whisper(
     job: Task, wavs_path: str, csv_path: str, language: str, start_id_regex: str, end_id_regex: str, assigned_only: bool = True
 ) -> Tuple[str, str]:
-    whisper_model = whisperts.load_model("large-v2", device="cuda")
+    whisper_model.load(language=lang_map[language])
     app_logger.info(f"wav_path: {wavs_path}")
     filenames = glob(os.path.join(wavs_path, "*.wav"))
     app_logger.info(f"Found {len(filenames)} wav files")
@@ -61,9 +87,9 @@ def align_wavs_whisper(
                 vad_segments = json.load(open(segments_path))
             else:
                 app_logger.info(f"Generating segments file {filename}")
-                audio = whisperts.load_audio(filename)
-                results = whisperts.transcribe(whisper_model, audio, vad=True, detect_disfluencies=False, language=language)
-                vad_segments = results["segments"]
+                results = whisper_model.predict({"instances": [{"url": filename}]})
+                text = results["predictions"][0]
+                vad_segments = results["segments"][0]
 
                 app_logger.info(f"Saving segments for {filename}")
                 with open(segments_path, "w") as f:
@@ -242,42 +268,15 @@ def align_wavs_whisper(
 
         df_final.to_csv(csv_path, index=False)
         app_logger.info(f"Saved the csv file in {csv_path}")
-        del whisper_model
+        whisper_model.unload()
         return output_wavs_dir, csv_path
 
     except Exception as e:
         app_logger.error(f"Error in aligning {filename}: {e}")
         app_logger.error(traceback.format_exc())
         shutil.rmtree(output_wavs_dir)
-        del whisper_model
+        whisper_model.unload()
         return None
-
-
-modelPyannote = Model.from_pretrained("pyannote/segmentation", use_auth_token="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")
-
-pipeline = VoiceActivityDetection(segmentation=modelPyannote)
-HYPER_PARAMETERS = {
-    # onset/offset activation thresholds
-    "onset": 0.5,
-    "offset": 0.5,
-    # remove speech regions shorter than that many seconds.
-    "min_duration_on": 0.0,
-    # fill non-speech regions shorter than that many seconds.
-    "min_duration_off": 0.05,
-}
-pipeline.instantiate(HYPER_PARAMETERS)
-padding = 0.25
-
-
-lang_map = {
-    "en": "english",
-    "fr": "french",
-    "es": "spanish",
-    "de": "german",
-    "it": "italian",
-}
-
-whisper_model = WhisperASR(model_size="large-v2", language="english")
 
 
 def align_wavs_vad(
@@ -368,7 +367,7 @@ def align_wavs_vad(
                     outputAudio.export(temp_file, format="wav")
                     # run ASR
                     try:
-                        result = whisper_model.predict({"instances": [{"url": temp_file}]})
+                        result, segments = whisper_model.predict({"instances": [{"url": temp_file}]})
                         asr = result["predictions"][0]
                         seg["asr"] = asr
                     except:

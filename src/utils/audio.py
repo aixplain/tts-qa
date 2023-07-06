@@ -260,7 +260,7 @@ def trim_audio(path, start, end, out_path):
     end = min(end, len(sound) / 1000)
     trimmed_sound = sound[start * 1000 : end * 1000]
     trimmed_sound.export(out_path, format="wav")
-    return out_path
+    return out_path, start, end
 
 
 # convert the audio to mono
