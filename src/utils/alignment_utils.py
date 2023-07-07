@@ -240,7 +240,7 @@ def align_wavs_whisper(
                 else:
                     wav_path = os.path.join(output_wavs_dir, "not_assigned", filename)
 
-                outpath = trim_audio(file_path, start, end, wav_path)
+                outpath, start, end = trim_audio(file_path, start, end, wav_path)
                 # create a row for the csv file
                 myrow = {
                     "status": status,
@@ -367,7 +367,7 @@ def align_wavs_vad(
                     outputAudio.export(temp_file, format="wav")
                     # run ASR
                     try:
-                        result, segments = whisper_model.predict({"instances": [{"url": temp_file}]})
+                        result = whisper_model.predict({"instances": [{"url": temp_file}]})
                         asr = result["predictions"][0]
                         seg["asr"] = asr
                     except:
@@ -466,7 +466,7 @@ def align_wavs_vad(
                 else:
                     wav_path = os.path.join(output_wavs_dir, "not_assigned", filename)
 
-                outpath = trim_audio(file_path, start, end, wav_path)
+                outpath, start, end = trim_audio(file_path, start, end, wav_path)
                 # create a row for the csv file
                 myrow = {
                     "status": status,

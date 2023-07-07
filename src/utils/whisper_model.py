@@ -33,8 +33,7 @@ class WhisperTimestampedASR:
         self.model = None
         self.ready = False
         self.device = device
-        options = dict(language=inverse_lang_map[language])
-        self.transcribe_options = dict(detect_disfluencies=False, vad=True, **options)
+        self.transcribe_options = dict(detect_disfluencies=False, vad=True, verbose=None, language=inverse_lang_map[language])
         self.model_size = model_size
 
     def load(self, language: str = None):
