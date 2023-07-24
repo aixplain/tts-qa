@@ -136,11 +136,11 @@ def process_datasets():
             with ThreadPoolExecutor(max_workers=16) as executor:
                 for sample in samples:
                     if sample.asr_text is None:
-                        executor.submit(asr_and_trim_, session, sample, language, "azure")
+                        executor.submit(asr_and_trim_, session, sample, language, "aws")
                     else:
                         app_logger.error(f"Sample {sample.id} already has asr_text")
                         # executor.submit(trim_only_, session, sample, language)
-                        executor.submit(asr_and_trim_, session, sample, language, "azure")
+                        executor.submit(asr_and_trim_, session, sample, language, "aws")
 
             # get samples with asr_text = null
             samples = (

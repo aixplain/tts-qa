@@ -66,14 +66,14 @@ def unsegmented_onboarding_job(
         # do alignment first and then upload
         aligned_wavs_dir, aligned_csv_path = align_wavs_vad(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
 
-    # TODO: make sure that you keep the aligned csv
-    shutil.rmtree(wavs_path, ignore_errors=True)
-    shutil.rmtree(csv_path, ignore_errors=True)
-
     app_logger.debug(f"aligned_wavs_dir: {aligned_wavs_dir}")
 
     # Simulate a long-running job
     upload_wav_samples(self, session, dataset_id, aligned_csv_path, deliverable=deliverable)
+
+    # TODO: make sure that you keep the aligned csv
+    shutil.rmtree(wavs_path, ignore_errors=True)
+    shutil.rmtree(csv_path, ignore_errors=True)
 
 
 def unsegmented_onboarding_job_sync(
