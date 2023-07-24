@@ -66,6 +66,7 @@ padding = 0.25
 def align_wavs_whisper(
     job: Task, wavs_path: str, csv_path: str, language: str, start_id_regex: str, end_id_regex: str, assigned_only: bool = True
 ) -> Tuple[str, str]:
+    app_logger.info(f"Aligning wavs in {wavs_path} with csv file {csv_path} using Whisper for {language}")
     whisper_model.load(language=lang_map[language])
     app_logger.info(f"wav_path: {wavs_path}")
     filenames = glob(os.path.join(wavs_path, "*.wav"))
@@ -282,6 +283,7 @@ def align_wavs_whisper(
 def align_wavs_vad(
     job: Task, wavs_path: str, csv_path: str, language: str, start_id_regex: str, end_id_regex: str, assigned_only: bool = True
 ) -> Tuple[str, str]:
+    app_logger.info(f"Aligning wavs in {wavs_path} with csv file {csv_path} using VAD for {language}")
     whisper_model.load(language=lang_map[language])
     app_logger.info(f"wav_path: {wavs_path}")
 

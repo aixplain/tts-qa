@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from src.logger import root_logger
 from src.paths import paths
-from src.utils.alignment_utils import align_wavs_vad, align_wavs_whisper
+from src.utils.alignment_utils import align_wavs_vad, align_wavs_whisper  # noqa F401
 from src.utils.db_utils import upload_wav_samples
 
 
@@ -60,7 +60,8 @@ def unsegmented_onboarding_job(
     app_logger.info(f"deliverable: {deliverable}")
     if language == "en":
         # do alignment first and then upload
-        aligned_wavs_dir, aligned_csv_path = align_wavs_whisper(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+        # aligned_wavs_dir, aligned_csv_path = align_wavs_whisper(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
     else:
         # do alignment first and then upload
         aligned_wavs_dir, aligned_csv_path = align_wavs_vad(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
@@ -88,7 +89,8 @@ def unsegmented_onboarding_job_sync(
 
     if language == "en":
         # do alignment first and then upload
-        aligned_wavs_dir, aligned_csv_path = align_wavs_whisper(None, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+        # aligned_wavs_dir, aligned_csv_path = align_wavs_whisper(None, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(None, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
     else:
         # do alignment first and then upload
         aligned_wavs_dir, aligned_csv_path = align_wavs_vad(None, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
