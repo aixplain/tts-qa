@@ -19,13 +19,13 @@ uvicorn src.service.api:app --port 8089 --reload
 ## Start Frontend
 ### 1. Annotator
 ```
-python -m streamlit run ./src/web_app/annotator/🏠_Intro_annotator.py  --server.maxUploadSize 2048
+python -m streamlit run --server.port 8504 /home/ubuntu/repos/tts-qa/src/web_app/annotator/🏠_Intro_annotator.py
 ```
 
 ### 2. Admin
 
 ```
-python -m streamlit run ./src/web_app/admin/🏠_Intro_admin.py  --server.maxUploadSize 2048
+python -m streamlit run --server.port 8502  --server.maxUploadSize 8192 /home/ubuntu/repos/tts-qa/src/web_app/admin/🏠_Intro_admin.py
 ```
 
 
