@@ -256,11 +256,11 @@ def normalize_audio(path, out_path):
 def trim_audio(path, start, end, out_path):
     sound = AudioSegment.from_file(path, format="wav")
     # make sure that the start and end are in between the audio duration
-    start = max(0, start)
-    end = min(end, len(sound) / 1000)
-    trimmed_sound = sound[start * 1000 : end * 1000]
+    start_time = max(0, start)
+    end_time = min(end, len(sound) / 1000)
+    trimmed_sound = sound[start_time * 1000 : end_time * 1000]
     trimmed_sound.export(out_path, format="wav")
-    return out_path, start, end
+    return out_path, start_time, end_time
 
 
 # convert the audio to mono

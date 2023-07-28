@@ -84,9 +84,9 @@ def asr_and_trim_(session_, sample, language, use="azure"):
 def trim_only_(session_, sample, language):
     response = trim_only(sample.local_path)
 
-    start = float(response["trim_start"]) - offset
-    end = float(response["trim_end"]) + offset
-    out_path, start, end = trim_audio(sample.local_path, sample.trim_start, sample.trim_end, sample.local_path.replace("raw", "trimmed"))
+    start = float(response["trim_start"])
+    end = float(response["trim_end"])
+    out_path, start, end = trim_audio(sample.local_path, start, end, sample.local_path.replace("raw", "trimmed"))
 
     sample.trim_start = round(float(start), 2)
     sample.trim_end = round(float(end), 2)
@@ -123,6 +123,7 @@ def process_datasets():
                 | (Sample.trim_start == None)
                 | (Sample.trim_end == None)
                 | (Sample.trimmed_audio_duration == None)
+                | (Sample.trimmed_audio_duration == 0)
                 | (Sample.longest_pause == None)
                 | (Sample.wer == None)
             )
@@ -138,7 +139,7 @@ def process_datasets():
                     if sample.asr_text is None:
                         executor.submit(asr_and_trim_, session, sample, language, "aws")
                     else:
-                        app_logger.error(f"Sample {sample.id} already has asr_text")
+                        app_logger.info(f"Sample {sample.id} already has asr_text")
                         executor.submit(trim_only_, session, sample, language)
                         # executor.submit(asr_and_trim_, session, sample, language, "aws")
 
@@ -155,6 +156,7 @@ def process_datasets():
                     | (Sample.trim_start == None)
                     | (Sample.trim_end == None)
                     | (Sample.trimmed_audio_duration == None)
+                    | (Sample.trimmed_audio_duration == 0)
                     | (Sample.longest_pause == None)
                     | (Sample.wer == None)
                 )
