@@ -805,7 +805,7 @@ def upload_file(session_, row, dataset_id, filename, s3, bucket_name, deliverabl
         s3RawPath=f"s3://{bucket_name}/{row['s3RawPath']}",
         s3TrimmedPath=None,
         original_text=row["text"],
-        asr_text=None,
+        asr_text=row["asr"] if "asr" in row else None,
         duration=meta["duration"],
         trim_start=None,
         trim_end=None,

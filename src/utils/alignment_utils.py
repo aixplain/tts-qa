@@ -476,6 +476,7 @@ def align_wavs_vad(
                     "file_name": filename,
                     "unique_identifier": df_sentences.loc[row["sentenceNumber"]]["unique_identifier"],
                     "text": df_sentences.loc[row["sentenceNumber"]]["text"],
+                    "asr": asr,
                     "sentence_length": df_sentences.loc[row["sentenceNumber"]]["sentence_length"],
                     "sentence_type": df_sentences.loc[row["sentenceNumber"]]["sentence_type"],
                 }

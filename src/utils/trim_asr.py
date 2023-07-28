@@ -50,7 +50,7 @@ s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), a
 bucket_name = os.environ.get("S3_BUCKET_NAME")
 dataset_dir = os.environ.get("S3_DATASET_DIR")
 
-offset = 0.5
+offset = 0.2
 
 
 def asr_and_trim_(session_, sample, language, use="azure"):
@@ -139,8 +139,8 @@ def process_datasets():
                         executor.submit(asr_and_trim_, session, sample, language, "aws")
                     else:
                         app_logger.error(f"Sample {sample.id} already has asr_text")
-                        # executor.submit(trim_only_, session, sample, language)
-                        executor.submit(asr_and_trim_, session, sample, language, "aws")
+                        executor.submit(trim_only_, session, sample, language)
+                        # executor.submit(asr_and_trim_, session, sample, language, "aws")
 
             # get samples with asr_text = null
             samples = (

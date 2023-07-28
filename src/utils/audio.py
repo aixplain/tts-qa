@@ -169,8 +169,8 @@ def asr_and_trim_aws(s3path, language="en"):
                 df_details["pauses"] = df_details["pauses"].fillna(0)
                 transcription = " ".join(df_details["text"])
 
-                start_time = df_details.loc[0, "start_time"]
-                end_time = df_details.loc[len(df_details) - 1, "end_time"]
+                start_time = df_details["start_time"].values[0]
+                end_time = df_details["end_time"].values[-1]
                 audio_duration = end_time - start_time
 
                 response["asr_text"] = transcription
