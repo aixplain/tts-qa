@@ -1,14 +1,16 @@
 import logging
 import os
 
+from tqdm import tqdm
 
-logging.basicConfig(level=logging.DEBUG)
+
+logging.basicConfig(level=logging.INFO)
 
 
 os.environ["TEAM_API_KEY"] = "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8"
 
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor  # noqa: F401
 from pathlib import Path
 
 import boto3
@@ -130,19 +132,17 @@ def process_datasets():
             .all()
         )
         while len(samples) > 0:
-            # for sample in tqdm(samples):
-            #     # get asr_text
-            #     postprocess(session, sample, language)
-            # do the above as threads
-            with ThreadPoolExecutor(max_workers=16) as executor:
-                for sample in samples:
-                    if sample.asr_text is None:
-                        executor.submit(asr_and_trim_, session, sample, language, "aws")
-                    else:
-                        app_logger.info(f"Sample {sample.id} already has asr_text")
-                        executor.submit(trim_only_, session, sample, language)
-                        # executor.submit(asr_and_trim_, session, sample, language, "aws")
-
+            for sample in tqdm(samples):
+                # while len(samples) > 0:
+                # with ThreadPoolExecutor(max_workers=10) as executor:
+                #     for sample in tqdm(samples):
+                #         if sample.asr_text is None:
+                #             executor.submit(asr_and_trim_, session, sample, language, "aws")
+                #         else:
+                #             app_logger.info(f"Sample {sample.id} already has asr_text")
+                #             executor.submit(trim_only_, session, sample, language)
+                #             # executor.submit(asr_and_trim_, session, sample, language, "aws")
+                trim_only_(session, sample, language)
             # get samples with asr_text = null
             samples = (
                 session.query(Sample)

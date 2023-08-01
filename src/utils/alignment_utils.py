@@ -247,6 +247,7 @@ def align_wavs_whisper(
                     "status": status,
                     "local_path": outpath,
                     "file_name": filename,
+                    "asr": asr,
                     "unique_identifier": df_sentences.loc[row["sentenceNumber"]]["unique_identifier"],
                     "text": df_sentences.loc[row["sentenceNumber"]]["text"],
                     "sentence_length": df_sentences.loc[row["sentenceNumber"]]["sentence_length"],
@@ -373,7 +374,7 @@ def align_wavs_vad(
                         asr = result["predictions"][0]
                         seg["asr"] = asr
                     except:
-                        app_logger.error(f"Failed to run ASR for {filename}")
+                        app_logger.error(f"Failed to run ASR for {filename} - traceback: {traceback.format_exc()}")
                         seg["asr"] = ""
                         pass
                     segments[start] = seg
