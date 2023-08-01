@@ -132,17 +132,12 @@ def process_datasets():
             .all()
         )
         while len(samples) > 0:
-            for sample in tqdm(samples):
-                # while len(samples) > 0:
-                # with ThreadPoolExecutor(max_workers=10) as executor:
-                #     for sample in tqdm(samples):
-                #         if sample.asr_text is None:
-                #             executor.submit(asr_and_trim_, session, sample, language, "aws")
-                #         else:
-                #             app_logger.info(f"Sample {sample.id} already has asr_text")
-                #             executor.submit(trim_only_, session, sample, language)
-                #             # executor.submit(asr_and_trim_, session, sample, language, "aws")
-                trim_only_(session, sample, language)
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                for sample in tqdm(samples):
+                    if sample.asr_text is None:
+                        executor.submit(asr_and_trim_, session, sample, language, "aws")
+                    else:
+                        trim_only_(session, sample, language)
             # get samples with asr_text = null
             samples = (
                 session.query(Sample)
