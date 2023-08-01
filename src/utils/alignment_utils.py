@@ -225,7 +225,7 @@ def align_wavs_whisper(
             # if not assigned, create a wav file with the start and end times of the segment
             app_logger.info(f"Trimming audio for {filename}, it will be saved in {output_wavs_dir}")
             # columns should be following: local_path,file_name,unique_identifier,text,sentence_length,sentence_type
-            columns = ["status", "local_path", "file_name", "unique_identifier", "text", "sentence_length", "sentence_type"]
+            columns = ["status", "local_path", "file_name", "unique_identifier", "text", "asr", "sentence_length", "sentence_type"]
             df_final = pd.DataFrame(columns=columns)
             for index, row in tqdm(df.iterrows(), total=len(df)):
                 start = row["start"]
@@ -247,9 +247,9 @@ def align_wavs_whisper(
                     "status": status,
                     "local_path": outpath,
                     "file_name": filename,
-                    "asr": asr,
                     "unique_identifier": df_sentences.loc[row["sentenceNumber"]]["unique_identifier"],
                     "text": df_sentences.loc[row["sentenceNumber"]]["text"],
+                    "asr": asr,
                     "sentence_length": df_sentences.loc[row["sentenceNumber"]]["sentence_length"],
                     "sentence_type": df_sentences.loc[row["sentenceNumber"]]["sentence_type"],
                 }
@@ -453,7 +453,7 @@ def align_wavs_vad(
             # if not assigned, create a wav file with the start and end times of the segment
             app_logger.info(f"Trimming audio for {filename}, it will be saved in {output_wavs_dir}")
             # columns should be following: local_path,file_name,unique_identifier,text,sentence_length,sentence_type
-            columns = ["status", "local_path", "file_name", "unique_identifier", "text", "sentence_length", "sentence_type"]
+            columns = ["status", "local_path", "file_name", "unique_identifier", "text", "asr", "sentence_length", "sentence_type"]
             df_final = pd.DataFrame(columns=columns)
             for index, row in tqdm(df.iterrows(), total=len(df)):
                 start = row["start"]
