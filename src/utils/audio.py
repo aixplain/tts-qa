@@ -132,6 +132,10 @@ def trim_only(path):
     timeline = vad.get_timeline().support()
     longest_pause = 0
     previous_end = 0
+    # for timelines that has diff lover than 0.2 sec remove segment
+    timeline_temp = [segment for segment in timeline if list(segment)[1] - list(segment)[0] > 0.25]
+    if len(timeline_temp) > 0:
+        timeline = timeline_temp
     for i, segment in enumerate(timeline):
         start, end = list(segment)
         if i == 0:

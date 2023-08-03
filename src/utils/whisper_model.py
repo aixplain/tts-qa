@@ -40,7 +40,7 @@ class WhisperTimestampedASR:
         app_logger.info(f"Loading Whisper model: {self.model_size}")
         if self.ready:
             app_logger.warning("Whisper model already loaded need to unload first")
-            return True
+            self.unload()
         if language:
             app_logger.info(f"Setting language to {language}")
             self.transcribe_options["language"] = language
