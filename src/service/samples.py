@@ -46,3 +46,23 @@ def annotate_sample(id: int, annotation: InputAnnotationModel) -> InfoModel:
         return InfoModel(**{"message": "Success"})
     except Exception as e:
         return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
+# lock sample for annotation
+@router.put("/{id}/lock")
+def lock_sample(id: int) -> InfoModel:
+    try:
+        db_utils.lock_sample(id)
+        return InfoModel(**{"message": "Success"})
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
+# unlock sample for annotation
+@router.put("/{id}/unlock")
+def unlock_sample(id: int) -> InfoModel:
+    try:
+        db_utils.unlock_sample(id)
+        return InfoModel(**{"message": "Success"})
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})

@@ -147,7 +147,15 @@ def trim_only(path):
             if pause > longest_pause:
                 longest_pause = pause
         previous_end = end
-    audio_duration = end_time - start_time
+    try:
+        audio_duration = end_time - start_time
+    except:
+        print(f"Error in audio duration calculation, do not triming file {path}")
+        # get audio dur in secs
+        audio_duration = librosa.get_duration(filename=path)
+        end_time = audio_duration
+        start_time = 0
+
     return {
         "trim_start": start_time,
         "trim_end": end_time,

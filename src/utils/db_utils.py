@@ -2,6 +2,7 @@ import os
 import shutil
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from typing import List, Tuple
 
 import boto3
@@ -24,7 +25,7 @@ from src.utils.audio import convert_to_88k, convert_to_mono, convert_to_s16le, e
 
 BASE_DIR = str(paths.PROJECT_ROOT_DIR.resolve())
 # load the .env file
-load_dotenv(os.path.join(BASE_DIR, "vars.env"))
+load_dotenv(os.path.join(BASE_DIR, "vars.env"), override=True)
 
 app_logger = root_logger.getChild("db_utils")
 s3_bucket_name = os.environ.get("S3_BUCKET_NAME")
@@ -588,18 +589,51 @@ def get_sample_by_id(id: int) -> Sample:
     return sample
 
 
+def lock_sample(id: int) -> bool:
+    # set param islocked to true
+    app_logger.debug(f"POSTGRES: Locking sample {id}")
+    with db.session.begin():
+        # check if the sample exists
+        sample = db.session.query(Sample).filter(Sample.id == id).first()
+        if not sample:
+            raise ValueError(f"Sample {id} does not exist")
+
+        sample.islocked = True
+        sample.locked_at = datetime.now()
+        db.session.commit()
+    return True
+
+
+def unlock_sample(id: int) -> bool:
+    # set param islocked to false
+    app_logger.debug(f"POSTGRES: Unlocking sample {id}")
+    with db.session.begin():
+        # check if the sample exists
+        sample = db.session.query(Sample).filter(Sample.id == id).first()
+        if not sample:
+            raise ValueError(f"Sample {id} does not exist")
+
+        sample.islocked = False
+        db.session.commit()
+    return True
+
+
 def annotate_sample(
     sample_id: int,
     annotator_id: int,
     final_text: str,
     final_sentence_type: str,
-    isRepeated: bool,
-    isAccentRight: bool,
-    isPronunciationRight: bool,
-    isClean: bool,
-    isPausesRight: bool,
-    isSpeedRight: bool,
-    isConsisent: bool,
+    # isRepeated: bool,
+    # isAccentRight: bool,
+    # isPronunciationRight: bool,
+    # isClean: bool,
+    # isPausesRight: bool,
+    # isSpeedRight: bool,
+    # isConsisent: bool,
+    incorrectProsody: bool,
+    inconsistentTextAudio: bool,
+    incorrectTrancuation: bool,
+    soundArtifacts: bool,
     feedback: str,
     status: str,
 ) -> None:
@@ -628,18 +662,36 @@ def annotate_sample(
             annotator_id=annotator_id,
             final_text=final_text,
             final_sentence_type=final_sentence_type,
-            isRepeated=isRepeated,
-            isAccentRight=isAccentRight,
-            isPronunciationRight=isPronunciationRight,
-            isClean=isClean,
-            isPausesRight=isPausesRight,
-            isSpeedRight=isSpeedRight,
-            isConsisent=isConsisent,
+            # isRepeated=isRepeated,
+            # isAccentRight=isAccentRight,
+            # isPronunciationRight=isPronunciationRight,
+            # isClean=isClean,
+            # isPausesRight=isPausesRight,
+            # isSpeedRight=isSpeedRight,
+            # isConsisent=isConsisent,
+            incorrectProsody=incorrectProsody,
+            inconsistentTextAudio=inconsistentTextAudio,
+            incorrectTrancuation=incorrectTrancuation,
+            soundArtifacts=soundArtifacts,
             feedback=feedback,
             status=Status(status),
         )
         db.session.add(annotation)
         db.session.commit()
+
+
+def correct_locked_times() -> bool:
+    # if locked time is more than 30 minutes, unlock the sample
+    app_logger.debug(f"POSTGRES: Correcting locked times")
+    with db.session.begin():
+        # check if the sample exists
+        samples = db.session.query(Sample).filter(Sample.islocked == True).all()
+        for sample in samples:
+            if sample.locked_at:
+                if (datetime.now() - sample.locked_at).total_seconds() > os.getenv("MAX_LOCKING_MIN") * 60:
+                    sample.islocked = False
+                    db.session.commit()
+    return True
 
 
 def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
@@ -651,6 +703,7 @@ def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
     Returns:
         List[Sample]: The list of samples.
     """
+    correct_locked_times()
     # this should query the net sample with highest wer in which  there is no annotation yet by checking the annotation table
     app_logger.debug(f"POSTGRES: Listing samples for dataset {dataset_id}")
     with db.session.begin():
@@ -665,6 +718,7 @@ def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
             db.session.query(Sample, Annotation)
             .outerjoin(Annotation, Sample.id == Annotation.sample_id)
             .filter(Sample.dataset_id == dataset_id)
+            .filter(Sample.islocked != True)
             .filter(Sample.wer > 0.2)
             .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.02 * func.length(Sample.original_text))
             .filter(

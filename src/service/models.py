@@ -87,6 +87,8 @@ class Sample(Base):  # type: ignore
     trim_end = Column(Float, unique=False, nullable=True)
     longest_pause = Column(Float, unique=False, nullable=True)
     wer = Column(Float, unique=False, nullable=True)
+    islocked = Column(Boolean, default=False, nullable=False)  # this is for locking sample that is being annotated
+    locked_at = Column(DateTime, default=None, nullable=True)
 
     annotation = relationship("Annotation", cascade="all, delete-orphan", backref="sample")
     __table_args__ = (
@@ -149,6 +151,7 @@ class Annotation(Base):  # type: ignore
     annotator_id = Column(Integer, ForeignKey("annotator.id"), nullable=True)
     sample_id = Column(Integer, ForeignKey("sample.id"), nullable=False)
     created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     status = Column(Enum(Status), default=Status.NotReviewed)
     final_text = Column(String(250), unique=False, nullable=True)
     final_sentence_type = Column(String(50), unique=False, nullable=True)
@@ -160,6 +163,12 @@ class Annotation(Base):  # type: ignore
     isSpeedRight = Column(Boolean, default=None, nullable=True)
     isConsisent = Column(Boolean, default=None, nullable=True)
     feedback = Column(String(250), unique=False, nullable=True)
+
+    # Additional fields
+    incorrectProsody = Column(Boolean, default=None, nullable=True)
+    inconsistentTextAudio = Column(Boolean, default=None, nullable=True)
+    incorrectTrancuation = Column(Boolean, default=None, nullable=True)
+    soundArtifacts = Column(Boolean, default=None, nullable=True)
 
     annotator = relationship("Annotator", backref=backref("annotations", passive_deletes=True))
 
@@ -184,6 +193,10 @@ class Annotation(Base):  # type: ignore
             "isPausesRight": self.isPausesRight,
             "isSpeedRight": self.isSpeedRight,
             "isConsisent": self.isConsisent,
+            "incorrectProsody": self.incorrectProsody,
+            "inconsistentTextAudio": self.inconsistentTextAudio,
+            "incorrectTrancuation": self.incorrectTrancuation,
+            "soundArtifacts": self.soundArtifacts,
             "feedback": self.feedback,
         }
 

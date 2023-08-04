@@ -149,8 +149,7 @@ def process_datasets():
         app_logger.info(f"Processing dataset: {dataset.name}")
 
         language = dataset.language
-        whisper_model.unload()
-        whisper_model.load(language=lang_map[language])
+
         samples = (
             session.query(Sample)
             .filter(Sample.dataset_id == dataset.id)
@@ -169,6 +168,9 @@ def process_datasets():
             )
             .all()
         )
+        if len(samples) > 0:
+            whisper_model.unload()
+            whisper_model.load(language=lang_map[language])
         while len(samples) > 0:
             with ThreadPoolExecutor(max_workers=10) as executor:
                 for sample in tqdm(samples):
