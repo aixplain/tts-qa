@@ -688,7 +688,7 @@ def correct_locked_times() -> bool:
         samples = db.session.query(Sample).filter(Sample.islocked == True).all()
         for sample in samples:
             if sample.locked_at:
-                if (datetime.now() - sample.locked_at).total_seconds() > os.getenv("MAX_LOCKING_MIN") * 60:
+                if (datetime.now() - sample.locked_at).total_seconds() > float(os.getenv("MAX_LOCKING_MIN")) * 60:
                     sample.islocked = False
                     db.session.commit()
     return True

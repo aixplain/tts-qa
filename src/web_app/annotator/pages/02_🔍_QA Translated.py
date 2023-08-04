@@ -192,6 +192,8 @@ def app():
                 if "message" in response:
                     st.session_state["sample"] = None
                     st.session_state["stats"] = None
+                    st.error("No more samples to annotate")
+                    app_logger.error("No more samples to annotate")
                     return
                 sample = response["sample"]
                 stats = response["stats"]
@@ -223,8 +225,8 @@ def app():
                 st.session_state["query_button"] = False
                 app_logger.info("Next sample retrieved")
             else:
-                st.error("No more samples to annotate")
-                app_logger.error("No more samples to annotate")
+                st.error(f"Failed to get next sample, status code: {response.status_code}")
+                app_logger.error(f"Failed to get next sample, status code: {response.status_code}")
         except Exception as e:
             app_logger.error(e)
 
