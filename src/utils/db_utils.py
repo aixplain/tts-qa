@@ -681,7 +681,7 @@ def annotate_sample(
 
 
 def correct_locked_times() -> bool:
-    # if locked time is more than 30 minutes, unlock the sample
+    # if locked time is more than 30 minutes then unlock
     app_logger.debug(f"POSTGRES: Correcting locked times")
     with db.session.begin():
         # check if the sample exists

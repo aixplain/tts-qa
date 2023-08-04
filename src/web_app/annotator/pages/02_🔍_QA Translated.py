@@ -1,6 +1,7 @@
 import os
 import sys
 
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -31,6 +32,58 @@ idx2lang = {v: k for k, v in lang2idx.items()}
 
 app_logger = root_logger.getChild("web_app::annotate")
 BACKEND_URL = "http://{}:{}".format(os.environ.get("SERVER_HOST"), os.environ.get("SERVER_PORT"))
+
+
+# Function to display json data in a structured way
+def display_json(data, col):
+    # If the data is a dictionary, display it as a table
+    table_data = None
+    if isinstance(data, dict):
+        # edit keys: replace _ with " " and title, and make values small case
+        # data = {k.replace("_", " ").title(): v for k, v in data.items()}
+        table_data = pd.DataFrame(data.items(), columns=["", ""])
+    # If the data is a list, display it as a table
+    elif isinstance(data, list):
+        table_data = pd.DataFrame(data)
+
+    if table_data is not None:
+        # transpose the table data
+        table_data = table_data.T
+        num_rows, num_cols = table_data.shape
+        # Calculate the desired height and width of the table
+        # You can adjust these values as per your requirement
+        table_height = (num_rows + 1) * 50  # 30 pixels per row, plus 1 row for header
+        table_width = num_cols * 450  # 150 pixels per column (adjust as desired)
+
+        # Generate the CSS styling for the table
+        table_style = f"""
+            <style>
+                .table-container {{
+                    margin-bottom: 50px;
+                }}
+                .table-container table {{
+                    width: {table_width}px;
+                    height: {table_height}px;
+                    table-layout: fixed;
+                }}
+                .table-container table tbody {{
+                    display: block;
+                    height: inherit;
+                    overflow: auto;
+                }}
+                .table-container table thead,
+                .table-container table tbody tr {{
+                    display: table;
+                    width: 100%;
+                    table-layout: fixed;
+                }}
+            </style>
+        """
+        # Display the table using Streamlit
+        col.markdown(table_style, unsafe_allow_html=True)
+        col.markdown(f'<div id="tbl_data">{table_data.to_html(index=False, header=False)}</div>', unsafe_allow_html=True)
+    else:
+        col.write(data)
 
 
 def app():
@@ -69,10 +122,11 @@ def app():
         unsafe_allow_html=True,
     )
 
-    columns_sizes = (40, 5, 5)
-
     if "sample" not in st.session_state:
         st.session_state["sample"] = None
+
+    if "run_id" not in st.session_state:
+        st.session_state["run_id"] = 0
 
     if "test_count" not in st.session_state:
         st.session_state["test_count"] = 0
@@ -192,7 +246,7 @@ def app():
                 if "message" in response:
                     st.session_state["sample"] = None
                     st.session_state["stats"] = None
-                    st.error("No more samples to annotate")
+                    st.error(f"Error: {response['message']}")
                     app_logger.error("No more samples to annotate")
                     return
                 sample = response["sample"]
@@ -230,57 +284,7 @@ def app():
         except Exception as e:
             app_logger.error(e)
 
-    def sample_container(sample):
-        container = st.container()
-
-        col1, col2, col3, col4 = container.columns(4)
-        col1.metric("ID", sample["filename"])
-        col2.metric("Sentence Type", f"{sample['sentence_type']}")
-        col3.metric("Length", "10")
-        col4.metric("WER", sample["wer"])
-
-        container.markdown("---")
-
-        container.markdown("## Listen Audio")
-        # audio player
-        audio_file = open(st.session_state["sample"]["local_trimmed_path"], "rb")
-        container.audio(audio_file, format="audio/wav")
-
-        container.markdown("---")
-        # Divide screen into 2 columns
-        col1, col2 = container.columns(2)
-        col1.subheader("Original Text")
-        col2.subheader("ASR")
-
-        # For all systems show all output sentences under each other and system names
-        original_text = col1.text_area(
-            "Original Text",
-            sample["original_text"],
-            key=f"original_text",
-            label_visibility="hidden",
-        )
-
-        asr_text = col2.text_area(
-            "ASR",
-            sample["asr_text"],
-            key=f"asr_text",
-            label_visibility="hidden",
-        )
-
-        # add vertival radio button for each system
-        better = st.radio("Selected Transcription", ["Original", "ASR"], key=f"better_select", index=0, horizontal=True)
-
-        ph = st.empty()
-        if better != "":
-            st.session_state["user_input"]["final_text"] = ph.text_area(
-                "Please post edit the text if needed",
-                st.session_state["sample"][f"{better.lower()}_text"],
-                key=f"best_sys",
-            )
-        sentence_type_list = ["Statement", "Question", "Exclamation"]
-        defult_idx = sentence_type_list.index(sample["sentence_type"].title())
-        sentence_type = st.radio("Sentence Type", sentence_type_list, key=f"sentence_type", index=defult_idx, horizontal=True)
-        st.session_state["user_input"]["final_sentence_type"] = sentence_type.lower()
+    columns_sizes = (15, 15, 5)
 
     st.session_state["prev_dataset_id"] = st.session_state["dataset_id"]
 
@@ -318,14 +322,76 @@ def app():
         if st.session_state["sample"] is not None:
 
             # Input sentence
-            sample_container(st.session_state["sample"])
+            # sample_container(st.session_state["sample"])
+            sample = st.session_state["sample"]
+            col1, col2, col3 = st.columns(columns_sizes)
+            col1.metric("ID", sample["filename"])
+            col2.metric("Sentence Type", f"{sample['sentence_type']}")
+            col3.metric("WER", sample["wer"])
+
+            st.markdown("---")
+
+            col1, col2 = st.columns(2)
+            original_text = col1.text_area(
+                "Original Text",
+                f'{sample["original_text"]}',
+            )
+            asr_text = col2.text_area(
+                "ASR Text",
+                sample["asr_text"],
+            )
+
+            st.markdown("---")
+
+            postedit_columns_sizes = (20, 10, 35, 10, 10)
+            # Divide screen into 2 columns
+            col1, col2, col3, col4, col5 = st.columns(postedit_columns_sizes)
+            # For all systems show all output sentences under each other and system names
+            col1.markdown("### Audio")
+            # audio player
+            audio_file = open(st.session_state["sample"]["local_trimmed_path"], "rb")
+            col1.audio(audio_file, format="audio/wav")
+
+            # add vertival radio button for each system
+            col2.markdown("### Select Better")
+            better = col2.radio(
+                "Selected Transcription",
+                ["Original", "ASR"],
+                key=f"better_select_{st.session_state['run_id']}",
+                index=0,
+                horizontal=True,
+                label_visibility="collapsed",
+            )
+
+            col3.markdown("### Post Edit")
+            ph = col3.empty()
+            if better != "":
+                st.session_state["user_input"]["final_text"] = ph.text_area(
+                    "Please post edit the text if needed",
+                    st.session_state["sample"][f"{better.lower()}_text"],
+                    key=f"best_sys_{st.session_state['run_id']}",
+                    label_visibility="collapsed",
+                )
+            col4.markdown("### Sentence Type")
+            sentence_type_list = ["Statement", "Question", "Exclamation"]
+            defult_idx = sentence_type_list.index(sample["sentence_type"].title())
+            sentence_type = col4.radio(
+                "Sentence Type", sentence_type_list, key=f"sentence_type_{st.session_state['run_id']}", index=defult_idx, label_visibility="collapsed"
+            )
+            st.session_state["user_input"]["final_sentence_type"] = sentence_type.lower()
+
+            col5.markdown("#")
+            col5.markdown("#")
+            col5.markdown("#")
+            col5.markdown("###")
+            submitted1 = col5.button("Submit", key=f"submit_container_{st.session_state['run_id']}")
 
             # create a divider
             st.markdown("---")
             # ask if you want to Discard or Save
             col1, col2 = st.columns(2)
             with col1:
-                discard = st.checkbox("Discard", value=False)
+                discard = st.checkbox("Discard", value=False, key=f"discard_{st.session_state['run_id']}")
 
             if discard:
                 col1, col2 = st.columns(2)
@@ -371,8 +437,9 @@ def app():
                 st.session_state["user_input"]["feedback"] = ""
             col1, col2 = st.columns((10, 1))
             with col2:
-                submitted = st.button("Submit")
-                if submitted:
+                submitted2 = st.button("Submit", key=f"submit_st_{st.session_state['run_id']}")
+                if submitted1 or submitted2:
+                    st.session_state["run_id"] += 1
                     if discard:
                         status = "Discarded"
                     else:
