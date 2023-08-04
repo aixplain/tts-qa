@@ -298,6 +298,10 @@ def app():
         st.session_state["query_button"] = True
         st.session_state["annotate_button"] = False
         st.session_state["isFirstRun"] = True
+        if st.session_state["sample"] is not None:
+            response = requests.put(BACKEND_URL + f"/samples/{int(st.session_state['sample']['id'])}/unlock")
+            if response.status_code == 200:
+                app_logger.info(f"Sample {int(st.session_state['sample']['id'])} unlocked")
         st.experimental_rerun()
 
     if st.session_state["dataset_id"] is not None:
@@ -343,14 +347,15 @@ def app():
 
             st.markdown("---")
 
-            postedit_columns_sizes = (20, 10, 35, 10, 10)
-            # Divide screen into 2 columns
-            col1, col2, col3, col4, col5 = st.columns(postedit_columns_sizes)
-            # For all systems show all output sentences under each other and system names
-            col1.markdown("### Audio")
+            st.markdown("### Audio")
             # audio player
             audio_file = open(st.session_state["sample"]["local_trimmed_path"], "rb")
-            col1.audio(audio_file, format="audio/wav")
+            st.audio(audio_file, format="audio/wav")
+
+            postedit_columns_sizes = (10, 35, 10, 10)
+            # Divide screen into 2 columns
+            col2, col3, col4, col5 = st.columns(postedit_columns_sizes)
+            # For all systems show all output sentences under each other and system names
 
             # add vertival radio button for each system
             col2.markdown("### Select Better")
