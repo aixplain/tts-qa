@@ -246,7 +246,6 @@ def app():
                 if "message" in response:
                     st.session_state["sample"] = None
                     st.session_state["stats"] = None
-                    st.error(f"Error: {response['message']}")
                     app_logger.error("No more samples to annotate")
                     return
                 sample = response["sample"]
@@ -328,7 +327,7 @@ def app():
             # Input sentence
             # sample_container(st.session_state["sample"])
             sample = st.session_state["sample"]
-            col1, col2, col3, col4 = st.columns(columns_sizes)
+            col1, col2, col3 = st.columns(columns_sizes)
             col1.metric("ID", sample["filename"])
             col2.metric("Sentence Type", f"{sample['sentence_type']}")
             col3.metric("WER", sample["wer"])

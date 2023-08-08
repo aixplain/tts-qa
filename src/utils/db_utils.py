@@ -718,9 +718,7 @@ def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
             .outerjoin(Annotation, Sample.id == Annotation.sample_id)
             .filter(Sample.dataset_id == dataset_id)
             .filter(Sample.islocked != True)
-            # .filter(Sample.is_selected_for_delivery == True)
-            .filter(Sample.wer > 0)
-            .filter(Sample.uncased_unpunctuated_wer > 0)
+            .filter(Sample.is_selected_for_delivery == True)
             # .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.02 * func.length(Sample.original_text))
             .filter(
                 not_(

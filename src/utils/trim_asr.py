@@ -57,10 +57,10 @@ dataset_dir = os.environ.get("S3_DATASET_DIR")
 
 offset = 0.2
 
-from src.utils.whisper_model import WhisperTimestampedASR
+# from src.utils.whisper_model import WhisperTimestampedASR
 
 
-whisper_model = WhisperTimestampedASR(model_size="medium", language="english", device="cuda")
+# whisper_model = WhisperTimestampedASR(model_size="medium", language="english", device="cuda")
 
 lang_map = {
     "en": "english",
@@ -166,15 +166,14 @@ def trim_and_asr_(session_, sample, language):
     session_.commit()
 
 
-def asr_only_(session_, sample, language, model):
-    asr = asr_aws(sample.s3TrimmedPath, language, model)
+def asr_only_(sample, language):
+    asr = asr_aws(sample.s3TrimmedPath, language)
     sample.asr_text = str(asr)
     # get duration
     sample.trimmed_audio_duration = librosa.get_duration(filename=sample.local_trimmed_path)
     sample.wer = round(float(utils.calculate_wer(sample.original_text.lower(), str(asr).lower())), 2)
     sample.uncased_unpunctuated_wer = round(float(wer_wo_punctuation(sample.original_text.lower(), str(asr).lower())), 2)
-    session_.add(sample)
-    session_.commit()
+    return sample
 
 
 def process_datasets():
@@ -186,8 +185,6 @@ def process_datasets():
         print(f"Processing dataset: {dataset.name}")
         app_logger.info(f"Processing dataset: {dataset.name}")
 
-        if dataset.id != 39:
-            continue
         language = dataset.language
 
         samples = (
@@ -212,13 +209,26 @@ def process_datasets():
         #     whisper_model.unload()
         #     whisper_model.load(language=lang_map[language])
         while samples:
-            with ThreadPoolExecutor(max_workers=8) as executor:
-                futures = [executor.submit(asr_only_, session, sample, language) for sample in samples]
+            with ThreadPoolExecutor(max_workers=32) as executor:
+                futures = [executor.submit(asr_only_, sample, language) for sample in samples]
 
                 # Use tqdm to display the progress of processing finished samples
                 for future in tqdm(as_completed(futures), total=len(futures), desc="Processing samples"):
                     try:
-                        future.result()
+                        sample = future.result()
+                        # Detach the sample from the main session
+                        session.expunge(sample)
+
+                        # Create a new temporary session
+                        Session = sessionmaker(bind=engine)
+                        tmp_session = Session()
+
+                        # Add the sample to the temporary session and commit the changes
+                        tmp_session.add(sample)
+                        tmp_session.commit()
+
+                        # Close the temporary session
+                        tmp_session.close()
                     except Exception as e:
                         app_logger.error(f"Error processing sample: traceback: {traceback.format_exc()}")
 

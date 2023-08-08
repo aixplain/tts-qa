@@ -28,11 +28,12 @@ db_user = os.getenv("POSTGRES_USER")
 db_password = os.getenv("POSTGRES_PWD")
 
 total_hours = 30
+include_extras = False
 
 from tqdm import tqdm
 
 
-for dataset_str in ["French(Dorsaf)", "Italian(Martina)", "Spanish(Violeta)", "English(Melynda)"]:
+for dataset_str in ["Italian(Martina)", "Spanish(Violeta)"]:  # "English(Melynda)", "French(Dorsaf)",
     if "English" in dataset_str:
         dataset = "English"
     elif "Spanish" in dataset_str:
@@ -45,9 +46,11 @@ for dataset_str in ["French(Dorsaf)", "Italian(Martina)", "Spanish(Violeta)", "E
         dataset = "Italian"
     print(f"Processing {dataset}...")
     df_wav = pd.read_csv(f"/data/tts-qa/share_{total_hours}h/{dataset}/{dataset}.csv")
-    df_extras = pd.read_csv(f"/data/tts-qa/share_{total_hours}h/{dataset}/{dataset}-extras.csv")
-    df = pd.concat([df_wav, df_extras], axis=0)
-
+    if include_extras:
+        df_extras = pd.read_csv(f"/data/tts-qa/share_{total_hours}h/{dataset}/{dataset}-extras.csv")
+        df = pd.concat([df_wav, df_extras], axis=0)
+    else:
+        df = df_wav
     # set all samples is_selected_for_delivery to true by matching filename in the postgres database
     filenames = df.filename.to_list()
 
@@ -66,7 +69,7 @@ for dataset_str in ["French(Dorsaf)", "Italian(Martina)", "Spanish(Violeta)", "E
                     WHERE dataset_id IN (
                         SELECT id
                         FROM dataset
-                        WHERE name LIKE '%' || '{dataset_str}' || '%'
+                        WHERE name= '{dataset_str}'
                     )
                     AND filename = '{filename}';
                 """
