@@ -164,6 +164,29 @@ def trim_only(path):
     }
 
 
+def asr_aws(s3path, language="en"):
+    model = api_keys_aws[language]["model"]
+    response = {}
+    count = 0
+    while count < 3 and response == {}:
+        try:
+            model_response = model.run(data=s3path, name=f"ASR model ({language})")
+            if model_response["status"] == "SUCCESS":
+                details = model_response["details"]["segments"]
+
+                df_details = pd.DataFrame(details)
+                df_details.dropna(inplace=True)
+
+                transcription = " ".join(df_details["text"])
+                return transcription
+        except Exception as e:
+            print(e)
+            count += 1
+            time.sleep(1)
+            continue
+    return ""
+
+
 def asr_and_trim_aws(s3path, language="en"):
     model = api_keys_aws[language]["model"]
     response = {}

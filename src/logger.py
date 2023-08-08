@@ -18,7 +18,7 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
 logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
 root_logger = logging.getLogger()
-root_logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+root_logger.setLevel(os.environ.get("LOG_LEVEL", "ERROR"))
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 warnings.simplefilter(action="ignore", category=UserWarning)

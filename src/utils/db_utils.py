@@ -13,7 +13,6 @@ from celery import Task
 from dotenv import load_dotenv
 from fastapi_sqlalchemy import db
 from sqlalchemy import not_
-from sqlalchemy.sql.expression import func
 from tqdm import tqdm
 from yaml.loader import SafeLoader
 
@@ -623,7 +622,7 @@ def annotate_sample(
     annotator_id: int,
     final_text: str,
     final_sentence_type: str,
-    # isRepeated: bool,
+    isRepeated: bool,
     # isAccentRight: bool,
     # isPronunciationRight: bool,
     # isClean: bool,
@@ -662,7 +661,7 @@ def annotate_sample(
             annotator_id=annotator_id,
             final_text=final_text,
             final_sentence_type=final_sentence_type,
-            # isRepeated=isRepeated,
+            isRepeated=isRepeated,
             # isAccentRight=isAccentRight,
             # isPronunciationRight=isPronunciationRight,
             # isClean=isClean,
@@ -719,8 +718,10 @@ def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
             .outerjoin(Annotation, Sample.id == Annotation.sample_id)
             .filter(Sample.dataset_id == dataset_id)
             .filter(Sample.islocked != True)
-            .filter(Sample.wer > 0.2)
-            .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.02 * func.length(Sample.original_text))
+            # .filter(Sample.is_selected_for_delivery == True)
+            .filter(Sample.wer > 0)
+            .filter(Sample.uncased_unpunctuated_wer > 0)
+            # .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.02 * func.length(Sample.original_text))
             .filter(
                 not_(
                     (Sample.local_trimmed_path == None)
@@ -728,6 +729,7 @@ def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
                     | (Sample.s3TrimmedPath == None)
                     | (Sample.s3RawPath == None)
                     | (Sample.asr_text == None)
+                    | (Sample.trimmed_audio_duration == None)
                 )
             )
             .order_by(Sample.wer.desc())

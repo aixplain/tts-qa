@@ -87,8 +87,10 @@ class Sample(Base):  # type: ignore
     trim_end = Column(Float, unique=False, nullable=True)
     longest_pause = Column(Float, unique=False, nullable=True)
     wer = Column(Float, unique=False, nullable=True)
+    uncased_unpunctuated_wer = Column(Float, unique=False, nullable=True)
     islocked = Column(Boolean, default=False, nullable=False)  # this is for locking sample that is being annotated
     locked_at = Column(DateTime, default=None, nullable=True)
+    is_selected_for_delivery = Column(Boolean, default=False, nullable=True)
 
     annotation = relationship("Annotation", cascade="all, delete-orphan", backref="sample")
     __table_args__ = (
