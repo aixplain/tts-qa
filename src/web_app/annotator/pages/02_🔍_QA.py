@@ -93,6 +93,7 @@ def app():
         # forward to the page where the user can login
         st.warning("Please login first")
         st.stop()
+
     with st.sidebar:
         if st.session_state["authentication_status"]:
             st.write(f'Welcome *{st.session_state["name"]}*')

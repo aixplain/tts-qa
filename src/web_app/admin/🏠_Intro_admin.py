@@ -43,8 +43,16 @@ authenticator = stauth.Authenticate(
 # sidebar
 with st.sidebar:
     name, authentication_status, username = authenticator.login("Login", "main")
+    # ig logged in and not admin then logout get user @router.get("/username/{username}")
     if st.session_state["authentication_status"]:
         authenticator.logout("Logout", "main")
+        user = requests.get(f"{BACKEND_URL}/annotators/username/{username}").json()
+        if not user["isadmin"]:
+            st.error("You are not authorized to access this page")
+            st.stop()
+
+    if st.session_state["authentication_status"]:
+
         st.write(f'Welcome *{st.session_state["name"]}*')
         choice = st.selectbox("Select an option", ["Create User", "Assign Dataset", "Delete User"])
         if choice == "Create User":

@@ -110,7 +110,8 @@ def list_datasets() -> List[Dataset]:
     """
     app_logger.debug("POSTGRES: Listing datasets")
     with db.session.begin():
-        datasets = db.session.query(Dataset).all()
+        # DICARD DATASET WITH ID 38 and 7
+        datasets = db.session.query(Dataset).filter(not_(Dataset.id.in_([38, 7]))).all()  ## TODO: remove this when we need these dataset
         db.session.commit()
 
     return datasets
@@ -464,6 +465,8 @@ def get_datasets_of_annotator(annotator_id: int) -> List[Dataset]:
             raise ValueError(f"Annotator {annotator_id} does not exist")
 
         datasets = annotator.datasets
+        # discard datasets with id 38 and 7
+        datasets = [dataset for dataset in datasets if dataset.id not in [38, 7]]  ## TODO: remove this when we need these dataset
         db.session.commit()
     return datasets
 

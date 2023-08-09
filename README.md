@@ -19,7 +19,7 @@ uvicorn src.service.api:app --port 8089 --reload
 ## Start Frontend
 ### 1. Annotator
 ```
-python -m streamlit run --server.port 8504 /home/ubuntu/repos/tts-qa/src/web_app/annotator/🏠_Intro_annotator.py
+python -m streamlit run --server.port 8501 /home/ubuntu/repos/tts-qa/src/web_app/annotator/🏠_Intro_annotator.py
 ```
 
 ### 2. Admin

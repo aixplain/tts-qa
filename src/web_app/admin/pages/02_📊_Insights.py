@@ -109,6 +109,11 @@ def app():
         # forward to the page where the user can login
         st.warning("Please login first")
         st.stop()
+    else:
+        user = requests.get(f"{BACKEND_URL}/annotators/username/{st.session_state['username']}").json()
+        if not user["isadmin"]:
+            st.error("You are not authorized to access this page")
+            st.stop()
 
     with st.sidebar:
         if st.session_state["authentication_status"]:
