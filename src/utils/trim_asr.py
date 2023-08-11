@@ -138,7 +138,7 @@ def trim_only_(session_, sample, language):
     session_.commit()
 
 
-def trim_and_asr_(session_, sample, language):
+def trim_and_asr_(sample, language):
     response = trim_only(sample.local_path)
 
     start = float(response["trim_start"]) - offset
@@ -161,9 +161,7 @@ def trim_and_asr_(session_, sample, language):
     sample.trimmed_audio_duration = round(float(end - start), 2)
     sample.longest_pause = round(float(response["longest_pause"]), 2)
     sample.wer = round(float(utils.calculate_wer(sample.original_text.lower(), str(asr).lower())), 2)
-
-    session_.add(sample)
-    session_.commit()
+    sample.uncased_unpunctuated_wer = round(float(wer_wo_punctuation(sample.original_text.lower(), str(asr).lower())), 2)
 
 
 def asr_only_(sample, language):
@@ -210,7 +208,7 @@ def process_datasets():
         #     whisper_model.load(language=lang_map[language])
         while samples:
             with ThreadPoolExecutor(max_workers=32) as executor:
-                futures = [executor.submit(asr_only_, sample, language) for sample in samples]
+                futures = [executor.submit(trim_and_asr_, sample, language) for sample in samples]
 
                 # Use tqdm to display the progress of processing finished samples
                 for future in tqdm(as_completed(futures), total=len(futures), desc="Processing samples"):
