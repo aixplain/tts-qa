@@ -82,6 +82,18 @@ def get_datasets_of_annotator(id: int) -> Union[List[DatasetModel], InfoModel]:
         return InfoModel(**{"message": "Failed", "error": str(e)})
 
 
+# get latest sample of the annotator
+@router.get("/{id}/samples/{dataset_id}/latest")
+def get_latest_sample_of_annotator(id: int, dataset_id: int) -> Union[SampleModel, InfoModel]:
+    try:
+        sample = db_utils.get_latest_sample_of_annotator(id, dataset_id)
+        if sample:
+            return SampleModel(**sample.to_dict())
+        return InfoModel(**{"message": "No sample found for this annotator in this dataset"})
+    except Exception as e:
+        return InfoModel(**{"message": "Failed", "error": str(e)})
+
+
 # # update an annotator
 # @router.put("/{id}")
 # def update_annotator(id: int, username: str, email: str) -> Union[AnnotatorModel, InfoModel]:

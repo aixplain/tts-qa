@@ -5,7 +5,7 @@ import os
 import sys
 
 import plotly.express as px
-import plotly.figure_factory as ff
+import plotly.figure_factory as ff  # noqa: F401
 import requests
 import streamlit as st
 
@@ -131,25 +131,33 @@ def app():
 
         col1, col2 = st.columns((5, 10))
         with col1:
-            st.subheader(f"Dataset Information")
+            st.subheader(f"Dataset")
             display_json(selected_dataset)
 
         with col2:
-            st.subheader("Annotator Information")
+            st.subheader("Annotators")
             display_json(annotators)
 
         st.markdown("---")
 
-        st.subheader("Sample Information")
-        display_json(samples)
+        # st.subheader("Sample Information")
+        # display_json(samples)
 
-        col1, col2 = st.columns((1, 1))
-        with col1:
-            st.subheader("Histogram: Sample Duration")
-            fig = ff.create_distplot([samples["duration"]], ["duration"])
-            st.plotly_chart(fig)
+        # col1, col2 = st.columns((1, 1))
+        # with col1:
+        #     st.subheader("Histogram: Sample Duration")
+        #     fig = ff.create_distplot([samples["duration"]], ["duration"])
+        #     st.plotly_chart(fig)
 
         if len(annotations) > 0:
+            # download anotations
+            st.download_button(
+                label="Download Annotations",
+                data=annotations.to_csv(index=False),
+                file_name=f"{selected_dataset['name']}_annotations.csv",
+                mime="text/csv",
+            )
+
             st.subheader("Annotation Information")
             st.dataframe(annotations)
 
@@ -158,7 +166,7 @@ def app():
             st.plotly_chart(fig)
 
             st.subheader("Histogram: Annotators")
-            fig = px.histogram(annotations, x="annotator_name")
+            fig = px.histogram(annotations, x="annotator")
             st.plotly_chart(fig)
 
             st.subheader("Annotation Text Comparison")

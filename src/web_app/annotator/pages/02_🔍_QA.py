@@ -136,7 +136,7 @@ def app():
         st.session_state["user_input"] = {
             "final_text": "",
             "final_sentence_type": "statement",
-            "isRepeated": False,
+            "isRepeated": True,
             # "isAccentRight": False,
             # "isPronunciationRight": False,
             # "isClean": False,
@@ -245,9 +245,10 @@ def app():
             if response.status_code == 200:
                 response = response.json()
                 if "message" in response:
+
                     st.session_state["sample"] = None
                     st.session_state["stats"] = None
-                    app_logger.error("No more samples to annotate")
+                    app_logger.error(f"Failed to get next sample. Error: {response['error']}")
                     return
                 sample = response["sample"]
                 stats = response["stats"]
@@ -256,7 +257,7 @@ def app():
                 st.session_state["user_input"] = {
                     "final_text": sample["original_text"],
                     "final_sentence_type": sample["sentence_type"],
-                    "isRepeated": False,
+                    "isRepeated": True,
                     # "isAccentRight": False,
                     # "isPronunciationRight": False,
                     # "isClean": False,
@@ -283,6 +284,17 @@ def app():
                 app_logger.error(f"Failed to get next sample, status code: {response.status_code}")
         except Exception as e:
             app_logger.error(e)
+
+    if st.button("See previous sample"):
+        # @router.get("/{id}/samples/latest")
+
+        response = requests.get(BACKEND_URL + f"/annotators/{st.session_state['annotator_id']}/samples/{st.session_state['dataset_id']}/latest").json()
+        if "message" in response:
+            st.warning(response["message"])
+        else:
+            st.session_state["sample"] = response
+            st.session_state["query_button"] = False
+            st.session_state["annotate_button"] = False
 
     columns_sizes = (15, 15, 5)
 
@@ -315,7 +327,7 @@ def app():
             st.session_state["query_button"] = False
             st.session_state["annotate_button"] = False
         # add progresss bar
-        if st.session_state["stats"] is not None:
+        if "stats" in st.session_state and st.session_state["stats"] is not None:
             progress_bar = st.progress(0, text="Progress")
             progress = st.session_state["stats"]["annotated"] / st.session_state["stats"]["total"]
             progress_bar.progress(
@@ -428,7 +440,7 @@ def app():
                 st.session_state["user_input"]["soundArtifacts"] = soundArtifacts
                 st.session_state["user_input"]["feedback"] = feedback
             else:
-                st.session_state["user_input"]["isRepeated"] = True
+                st.session_state["user_input"]["isRepeated"] = False
                 # st.session_state["user_input"]["isAccentRight"] = True
                 # st.session_state["user_input"]["isPronunciationRight"] = True
                 # st.session_state["user_input"]["isClean"] = True

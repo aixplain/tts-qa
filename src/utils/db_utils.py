@@ -197,7 +197,14 @@ def get_annotators_of_dataset(id: int) -> List[Annotator]:
         dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
         if not dataset:
             raise ValueError(f"Dataset {id} does not exist")
-        annotators = dataset.annotators
+        # get the annotators that has samples annotated in this dataset
+        annotators = (
+            db.session.query(Annotator)
+            .join(Annotation, Annotator.id == Annotation.annotator_id)
+            .join(Sample, Annotation.sample_id == Sample.id)
+            .filter(Sample.dataset_id == id, Sample.is_selected_for_delivery == True)
+        )
+        annotators = annotators.all()
         db.session.commit()
     return annotators
 
@@ -212,39 +219,39 @@ def get_annotations_of_dataset(id: int) -> List[dict]:
             raise ValueError(f"Dataset {id} does not exist")
         # join annotator and annotation and only get annotations of samples of this dataset
         # for each annotation also append the annotator name by joining on annotator_id
+        # it should return all samples even if there is no annotation
         results = (
             session.query(Annotation, Annotator, Sample)
-            .join(Sample, Annotation.sample_id == Sample.id)
             .join(Annotator, Annotation.annotator_id == Annotator.id)
+            .join(Sample, Annotation.sample_id == Sample.id, isouter=True)
             .filter(Sample.dataset_id == id)
+            .filter(Sample.is_selected_for_delivery == True)
+            .order_by(Sample.filename)
         )
+
         results = results.all()
         # Process the results and create a list of dictionaries
-        annotations_list = []
+        result_list = []
         for annotation, annotator, sample in results:
-            annotation_dict = {
-                "id": annotation.id,
-                "sample_id": annotation.sample_id,
-                "annotator_id": annotation.annotator_id,
-                "created_at": str(annotation.created_at),
-                "final_text": annotation.final_text,
-                "isRepated": annotation.isRepated,
-                "isAccentRight": annotation.isAccentRight,
-                "isClean": annotation.isClean,
-                "isSpeedRight": annotation.isSpeedRight,
-                "feedback": annotation.feedback,
-                "status": annotation.status,
-                "final_sentence_type": annotation.final_sentence_type,
-                "isPronunciationRight": annotation.isPronunciationRight,
-                "isPausesRight": annotation.isPausesRight,
-                "isConsisent": annotation.isConsisent,
-                "annotator_name": annotator.name,
+            # get following values filename, annotation status (reviewd, discarded or none if there is no annotation)
+            result_dict = {
                 "filename": sample.filename,
-                "original_text": sample.original_text,
+                "original_text": sample.original_text if sample else None,
+                "sentence_type": sample.sentence_type if sample else None,
+                "status": annotation.status.value if annotation else None,
+                "annotator": annotator.name if annotator else None,
+                "feedback": annotation.feedback if annotation else None,
+                "final_text": annotation.final_text if annotation else None,
+                "final_sentence_type": annotation.final_sentence_type if annotation else None,
+                "isRepeated": annotation.isRepeated if annotation else None,
+                "incorrectProsody": annotation.incorrectProsody if annotation else None,
+                "inconsistentTextAudio": annotation.inconsistentTextAudio if annotation else None,
+                "incorrectTrancuation": annotation.incorrectTrancuation if annotation else None,
+                "soundArtifacts": annotation.soundArtifacts if annotation else None,
             }
-            annotations_list.append(annotation_dict)
+            result_list.append(result_dict)
 
-    return annotations_list
+    return result_list
 
 
 ########################
@@ -469,6 +476,40 @@ def get_datasets_of_annotator(annotator_id: int) -> List[Dataset]:
         datasets = [dataset for dataset in datasets if dataset.id not in [38, 7]]  ## TODO: remove this when we need these dataset
         db.session.commit()
     return datasets
+
+
+def get_latest_sample_of_annotator(annotator_id: int, dataset_id: int) -> Sample:
+    """Get the latest sample of an annotator.
+
+    Args:
+        annotator_id (int): The annotator id to get the latest sample from.
+
+    Returns:
+        Sample: The latest sample of the annotator.
+    """
+    app_logger.debug(f"POSTGRES: Getting latest sample of annotator {annotator_id}")
+    with db.session.begin():
+        # check if the annotator exists
+        annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
+        if not annotator:
+            raise ValueError(f"Annotator {annotator_id} does not exist")
+
+        # check if the dataset exists
+        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise ValueError(f"Dataset {dataset_id} does not exist")
+        # get the latest sample of the annotator
+        sample = (
+            db.session.query(Sample)
+            .join(Annotation, Sample.id == Annotation.sample_id)
+            .join(Annotator, Annotation.annotator_id == Annotator.id)
+            .filter(Sample.dataset_id == dataset_id)
+            .filter(Annotator.id == annotator_id)
+            .order_by(Annotation.created_at.desc())
+            .first()
+        )
+        db.session.commit()
+    return sample
 
 
 def update_annotator(id: int, **kwargs) -> None:
