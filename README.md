@@ -32,7 +32,7 @@ python -m streamlit run --server.port 8502  --server.maxUploadSize 8192 /home/ub
 ### How to dupp and restore the database
 
 ```bash
-docker exec -t postgres_container_prod pg_dump -U postgres  prod_tts_db > dump_`date +%Y-%m-%d"_"%H_%M_%S`.sql
+docker exec -t postgres_container_dev pg_dump -U postgres  dev_tts_db > dump_`date +%Y-%m-%d"_"%H_%M_%S`.sql
 
 cat dump_2023-08-08_10_16_24.sql | docker exec -i postgres_container_dev  psql -U postgres dev_tts_db
 

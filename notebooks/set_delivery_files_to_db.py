@@ -27,13 +27,15 @@ db_name = os.getenv("POSTGRES_DB")
 db_user = os.getenv("POSTGRES_USER")
 db_password = os.getenv("POSTGRES_PWD")
 
-total_hours = 30
+total_hours = 20
 include_extras = False
 
 from tqdm import tqdm
 
 
-for dataset_str in ["English(Melynda)", "French(Dorsaf)"]:  # "Italian(Martina)", "Spanish(Violeta)"]:  # "English(Melynda)", "French(Dorsaf)",
+for dataset_str in [
+    "German(Dorothee)"
+]:  # ["English(Melynda)", "French(Dorsaf)"]:  # "Italian(Martina)", "Spanish(Violeta)"]:  # "English(Melynda)", "French(Dorsaf)",
     if "English" in dataset_str:
         dataset = "English"
     elif "Spanish" in dataset_str:
