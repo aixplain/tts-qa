@@ -33,7 +33,7 @@ include_extras = False
 from tqdm import tqdm
 
 
-for dataset_str in ["French(Dorsaf)"]:  # "Italian(Martina)", "Spanish(Violeta)"]:  # "English(Melynda)", "French(Dorsaf)",
+for dataset_str in ["English(Melynda)", "French(Dorsaf)"]:  # "Italian(Martina)", "Spanish(Violeta)"]:  # "English(Melynda)", "French(Dorsaf)",
     if "English" in dataset_str:
         dataset = "English"
     elif "Spanish" in dataset_str:
