@@ -285,7 +285,7 @@ def app():
         except Exception as e:
             app_logger.error(e)
 
-    if st.button("See previous sample"):
+    if st.button("See Latest Annotation"):
         # @router.get("/{id}/samples/latest")
 
         response = requests.get(BACKEND_URL + f"/annotators/{st.session_state['annotator_id']}/samples/{st.session_state['dataset_id']}/latest").json()
@@ -472,6 +472,21 @@ def app():
 
     else:
         st.warning("Select Annotator and Dataset")
+
+    # Inject the JavaScript code to modify the controlsList attribute of the audio element
+    st.markdown(
+        """
+        <script>
+            setTimeout(function(){
+                var audioElement = document.querySelector('.stAudio');
+                if (audioElement) {
+                    audioElement.setAttribute('controlslist', 'nodownload');
+                }
+            }, 1000); // Delay of 1 second
+        </script>
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 app()

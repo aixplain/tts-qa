@@ -71,35 +71,36 @@ def create_dataset(name: str, language: str, description: str) -> Dataset:
         Dataset: The dataset created.
     """
     app_logger.debug(f"POSTGRES: Creating dataset {name}")
-    with db.session.begin():
-        # check if the dataset already exists
-        dataset = db.session.query(Dataset).filter(Dataset.name == name).first()
-        if dataset:
-            raise ValueError(f"Dataset {name} already exists")
+    try:
+        with db.session.begin():
+            # check if the dataset already exists
+            dataset = db.session.query(Dataset).filter(Dataset.name == name).first()
+            if dataset:
+                raise ValueError(f"Dataset {name} already exists")
 
-        dataset = Dataset(name=name, language=language, description=description)
-        db.session.add(dataset)
-        # create paths for the dataset
-        dataset_path = paths.LOCAL_BUCKET_DIR / s3_dataset_dir / dataset.name
-        dataset_path.mkdir(parents=True, exist_ok=True)
+            dataset = Dataset(name=name, language=language, description=description)
+            db.session.add(dataset)
+            # create paths for the dataset
+            dataset_path = paths.LOCAL_BUCKET_DIR / s3_dataset_dir / dataset.name
+            dataset_path.mkdir(parents=True, exist_ok=True)
 
-        # raw paths
-        raw_path = dataset_path / "raw"
-        raw_path.mkdir(parents=True, exist_ok=True)
+            # raw paths
+            raw_path = dataset_path / "raw"
+            raw_path.mkdir(parents=True, exist_ok=True)
 
-        # trimmed
-        trimmed_path = dataset_path / "trimmed"
-        trimmed_path.mkdir(parents=True, exist_ok=True)
+            # trimmed
+            trimmed_path = dataset_path / "trimmed"
+            trimmed_path.mkdir(parents=True, exist_ok=True)
 
-        db.session.commit()
-
-    # this dataset to all annotators qho are admin
-    annotators = db.session.query(Annotator).filter(Annotator.isadmin == True).all()
-    for annotator in annotators:
-        annotator.datasets.append(dataset)
-    db.session.commit()
-
-    return dataset
+            # this dataset to all annotators qho are admin
+            annotators = db.session.query(Annotator).filter(Annotator.isadmin == True).all()
+            for annotator in annotators:
+                annotator.datasets.append(dataset)
+            db.session.commit()
+            return dataset
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def list_datasets() -> List[Dataset]:
@@ -109,12 +110,15 @@ def list_datasets() -> List[Dataset]:
         List[Dataset]: The list of datasets.
     """
     app_logger.debug("POSTGRES: Listing datasets")
-    with db.session.begin():
-        # DICARD DATASET WITH ID 38 and 7
-        datasets = db.session.query(Dataset).filter(not_(Dataset.id.in_([38, 7]))).all()  ## TODO: remove this when we need these dataset
-        db.session.commit()
-
-    return datasets
+    try:
+        with db.session.begin():
+            # DICARD DATASET WITH ID 38 and 7
+            datasets = db.session.query(Dataset).filter(not_(Dataset.id.in_([38, 7]))).all()  ## TODO: remove this when we need these dataset
+            db.session.commit()
+            return datasets
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def delete_dataset(id: int) -> None:
@@ -124,19 +128,23 @@ def delete_dataset(id: int) -> None:
         id (int): The dataset id to delete.
     """
     app_logger.debug(f"POSTGRES: Deleting dataset {id}")
-    with db.session.begin():
-        # check if the dataset exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {id} does not exist")
-        dataset.annotators = []
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        db.session.delete(dataset)
-        db.session.commit()
+    try:
+        with db.session.begin():
+            # check if the dataset exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {id} does not exist")
+            dataset.annotators = []
+            dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+            db.session.delete(dataset)
+            db.session.commit()
 
-        # delete the dataset folder
-        dataset_path = paths.LOCAL_BUCKET_DIR / s3_dataset_dir / dataset.name
-        shutil.rmtree(dataset_path)
+            # delete the dataset folder
+            dataset_path = paths.LOCAL_BUCKET_DIR / s3_dataset_dir / dataset.name
+            shutil.rmtree(dataset_path)
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_dataset_by_id(id: int) -> Dataset:
@@ -149,14 +157,18 @@ def get_dataset_by_id(id: int) -> Dataset:
         Dataset: The dataset.
     """
     app_logger.debug(f"POSTGRES: Getting dataset {id}")
-    with db.session.begin():
-        # check if the dataset exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {id} does not exist")
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        db.session.commit()
-    return dataset
+    try:
+        with db.session.begin():
+            # check if the dataset exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {id} does not exist")
+            dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+            db.session.commit()
+        return dataset
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def update_dataset(id: int, **kwargs) -> None:
@@ -167,19 +179,23 @@ def update_dataset(id: int, **kwargs) -> None:
         **kwargs: The fields to update.
     """
     app_logger.debug(f"POSTGRES: Updating dataset {id}")
-    with db.session.begin():
-        # check if the dataset exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {id} does not exist")
-        # check if name in kwargs
-        if "name" in kwargs:
-            # check if the dataset already exists
-            dataset = db.session.query(Dataset).filter(Dataset.name == kwargs["name"]).first()
-            if dataset:
-                raise ValueError(f"Dataset {kwargs['name']} already exists")
-        db.session.query(Dataset).filter(Dataset.id == id).update(kwargs)
-        db.session.commit()
+    try:
+        with db.session.begin():
+            # check if the dataset exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {id} does not exist")
+            # check if name in kwargs
+            if "name" in kwargs:
+                # check if the dataset already exists
+                dataset = db.session.query(Dataset).filter(Dataset.name == kwargs["name"]).first()
+                if dataset:
+                    raise ValueError(f"Dataset {kwargs['name']} already exists")
+            db.session.query(Dataset).filter(Dataset.id == id).update(kwargs)
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_annotators_of_dataset(id: int) -> List[Annotator]:
@@ -192,66 +208,73 @@ def get_annotators_of_dataset(id: int) -> List[Annotator]:
         List[Annotator]: The list of annotators.
     """
     app_logger.debug(f"POSTGRES: Getting annotators of dataset {id}")
-    with db.session.begin():
-        # check if the dataset exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {id} does not exist")
-        # get the annotators that has samples annotated in this dataset
-        annotators = (
-            db.session.query(Annotator)
-            .join(Annotation, Annotator.id == Annotation.annotator_id)
-            .join(Sample, Annotation.sample_id == Sample.id)
-            .filter(Sample.dataset_id == id, Sample.is_selected_for_delivery == True)
-        )
-        annotators = annotators.all()
-        db.session.commit()
-    return annotators
+    try:
+        with db.session.begin():
+            # check if the dataset exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {id} does not exist")
+            # get the annotators that has samples annotated in this dataset
+            annotators = (
+                db.session.query(Annotator)
+                .join(Annotation, Annotator.id == Annotation.annotator_id)
+                .join(Sample, Annotation.sample_id == Sample.id)
+                .filter(Sample.dataset_id == id, Sample.is_selected_for_delivery == True)
+            )
+            annotators = annotators.all()
+            db.session.commit()
+        return annotators
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_annotations_of_dataset(id: int) -> List[dict]:
     # need to join samples, annotations, annotators. it should return annotation and together with annotater name
     app_logger.debug(f"POSTGRES: Getting annotations of dataset {id}")
-    with db.session.begin():
-        # check if the dataset exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {id} does not exist")
-        # join annotator and annotation and only get annotations of samples of this dataset
-        # for each annotation also append the annotator name by joining on annotator_id
-        # it should return all samples even if there is no annotation
-        results = (
-            session.query(Annotation, Annotator, Sample)
-            .join(Annotator, Annotation.annotator_id == Annotator.id)
-            .join(Sample, Annotation.sample_id == Sample.id, isouter=True)
-            .filter(Sample.dataset_id == id)
-            .filter(Sample.is_selected_for_delivery == True)
-            .order_by(Sample.filename)
-        )
+    try:
+        with db.session.begin():
+            # check if the dataset exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {id} does not exist")
+            # join annotator and annotation and only get annotations of samples of this dataset
+            # for each annotation also append the annotator name by joining on annotator_id
+            # it should return all samples even if there is no annotation
+            results = (
+                session.query(Annotation, Annotator, Sample)
+                .join(Annotator, Annotation.annotator_id == Annotator.id)
+                .join(Sample, Annotation.sample_id == Sample.id, isouter=True)
+                .filter(Sample.dataset_id == id)
+                .filter(Sample.is_selected_for_delivery == True)
+                .order_by(Sample.filename)
+            )
 
-        results = results.all()
-        # Process the results and create a list of dictionaries
-        result_list = []
-        for annotation, annotator, sample in results:
-            # get following values filename, annotation status (reviewd, discarded or none if there is no annotation)
-            result_dict = {
-                "filename": sample.filename,
-                "original_text": sample.original_text if sample else None,
-                "sentence_type": sample.sentence_type if sample else None,
-                "status": annotation.status.value if annotation else None,
-                "annotator": annotator.name if annotator else None,
-                "feedback": annotation.feedback if annotation else None,
-                "final_text": annotation.final_text if annotation else None,
-                "final_sentence_type": annotation.final_sentence_type if annotation else None,
-                "isRepeated": annotation.isRepeated if annotation else None,
-                "incorrectProsody": annotation.incorrectProsody if annotation else None,
-                "inconsistentTextAudio": annotation.inconsistentTextAudio if annotation else None,
-                "incorrectTrancuation": annotation.incorrectTrancuation if annotation else None,
-                "soundArtifacts": annotation.soundArtifacts if annotation else None,
-            }
-            result_list.append(result_dict)
-
-    return result_list
+            results = results.all()
+            # Process the results and create a list of dictionaries
+            result_list = []
+            for annotation, annotator, sample in results:
+                # get following values filename, annotation status (reviewd, discarded or none if there is no annotation)
+                result_dict = {
+                    "filename": sample.filename,
+                    "original_text": sample.original_text if sample else None,
+                    "sentence_type": sample.sentence_type if sample else None,
+                    "status": annotation.status.value if annotation else None,
+                    "annotator": annotator.name if annotator else None,
+                    "feedback": annotation.feedback if annotation else None,
+                    "final_text": annotation.final_text if annotation else None,
+                    "final_sentence_type": annotation.final_sentence_type if annotation else None,
+                    "isRepeated": annotation.isRepeated if annotation else None,
+                    "incorrectProsody": annotation.incorrectProsody if annotation else None,
+                    "inconsistentTextAudio": annotation.inconsistentTextAudio if annotation else None,
+                    "incorrectTrancuation": annotation.incorrectTrancuation if annotation else None,
+                    "soundArtifacts": annotation.soundArtifacts if annotation else None,
+                }
+                result_list.append(result_dict)
+            return result_list
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 ########################
@@ -266,11 +289,15 @@ def list_annotators() -> List[Annotator]:
         List[Annotator]: The list of annotators.
     """
     app_logger.debug("POSTGRES: Listing annotators")
-    with db.session.begin():
-        annotators = db.session.query(Annotator).all()
-        db.session.commit()
+    try:
+        with db.session.begin():
+            annotators = db.session.query(Annotator).all()
+            db.session.commit()
 
-    return annotators
+        return annotators
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def create_annotator(username: str, name: str, email: str, password: str, ispreauthorized: bool = True, isadmin: bool = False) -> Annotator:
@@ -284,68 +311,72 @@ def create_annotator(username: str, name: str, email: str, password: str, isprea
         Annotator: The annotator created.
     """
     app_logger.debug(f"POSTGRES: Creating annotator {username}")
-    with db.session.begin():
-        # check if the annotator already exists
-        annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
-        if annotator:
-            raise ValueError(f"Annotator {username} already exists")
+    try:
+        with db.session.begin():
+            # check if the annotator already exists
+            annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
+            if annotator:
+                raise ValueError(f"Annotator {username} already exists")
 
-        annotator = Annotator(
-            username=username, name=name, email=email, hashed_password=generate_password_hash(password), ispreauthorized=ispreauthorized, isadmin=isadmin
-        )
-        yaml_path = paths.LOGIN_CONFIG_PATH
+            annotator = Annotator(
+                username=username, name=name, email=email, hashed_password=generate_password_hash(password), ispreauthorized=ispreauthorized, isadmin=isadmin
+            )
+            yaml_path = paths.LOGIN_CONFIG_PATH
 
-        if not yaml_path.exists():
-            app_logger.info("Creating login config file")
-            yaml_path.parent.mkdir(parents=True, exist_ok=True)
-            yaml_path.touch()
+            if not yaml_path.exists():
+                app_logger.info("Creating login config file")
+                yaml_path.parent.mkdir(parents=True, exist_ok=True)
+                yaml_path.touch()
 
-            config = {
-                "credentials": {"usernames": {}},
-                "cookie": {"expiry_days": 0, "key": "some_signature_key", "name": "some_cookie_name"},
-                "preauthorized": {"emails": []},
+                config = {
+                    "credentials": {"usernames": {}},
+                    "cookie": {"expiry_days": 0, "key": "some_signature_key", "name": "some_cookie_name"},
+                    "preauthorized": {"emails": []},
+                }
+                with open(yaml_path, "w") as file:
+                    yaml.dump(config, file, default_flow_style=False)
+
+            with open(yaml_path) as file:
+                config = yaml.load(file, Loader=SafeLoader)
+
+            # add  the annotator to the login config
+
+            config["credentials"]["usernames"][username] = {  # type: ignore
+                "email": annotator.email,
+                "name": annotator.name,
+                "password": annotator.hashed_password,
             }
+
+            if annotator.ispreauthorized:
+                if annotator.email not in config["preauthorized"]["emails"]:  # type: ignore
+                    raise ValueError(f"Annotator {username} is not preauthorized")
+
             with open(yaml_path, "w") as file:
-                yaml.dump(config, file, default_flow_style=False)
+                yaml.dump(config, file)
 
-        with open(yaml_path) as file:
-            config = yaml.load(file, Loader=SafeLoader)
-
-        # add  the annotator to the login config
-
-        config["credentials"]["usernames"][username] = {  # type: ignore
-            "email": annotator.email,
-            "name": annotator.name,
-            "password": annotator.hashed_password,
-        }
-
-        if annotator.ispreauthorized:
-            if annotator.email not in config["preauthorized"]["emails"]:  # type: ignore
-                raise ValueError(f"Annotator {username} is not preauthorized")
-
-        with open(yaml_path, "w") as file:
-            yaml.dump(config, file)
-
-        # try to commit the annotator to the database if it fails, delete the annotator from the login config
-        try:
-            db.session.add(annotator)
-            if annotator.isadmin:
-                # assign all dataset to the admin
-                datasets = db.session.query(Dataset).all()
-                for dataset in datasets:
-                    annotator.datasets.append(dataset)
-                db.session.commit()
-        except Exception as e:
-            app_logger.error(f"POSTGRES: Failed to create annotator {username}")
-            app_logger.error(e)
-            # delete the annotator from the login config
-            del config["credentials"]["usernames"][username]  # type: ignore
-            # if annotator.ispreauthorized:
-            #     config["preauthorized"]["emails"].remove(annotator.email)  # type: ignore
-            with open(yaml_path, "w") as file:
-                yaml.dump(config, file, default_flow_style=False)
-            raise e
-    return annotator
+            # try to commit the annotator to the database if it fails, delete the annotator from the login config
+            try:
+                db.session.add(annotator)
+                if annotator.isadmin:
+                    # assign all dataset to the admin
+                    datasets = db.session.query(Dataset).all()
+                    for dataset in datasets:
+                        annotator.datasets.append(dataset)
+                    db.session.commit()
+            except Exception as e:
+                app_logger.error(f"POSTGRES: Failed to create annotator {username}")
+                app_logger.error(e)
+                # delete the annotator from the login config
+                del config["credentials"]["usernames"][username]  # type: ignore
+                # if annotator.ispreauthorized:
+                #     config["preauthorized"]["emails"].remove(annotator.email)  # type: ignore
+                with open(yaml_path, "w") as file:
+                    yaml.dump(config, file, default_flow_style=False)
+                raise e
+        return annotator
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def delete_annotator(id: int) -> None:
@@ -355,35 +386,39 @@ def delete_annotator(id: int) -> None:
         id (int): The annotator id to delete.
     """
     app_logger.debug(f"POSTGRES: Deleting annotator {id}")
-    with db.session.begin():
-        # check if the annotator exists
-        annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
-        if not annotator:
-            raise ValueError(f"Annotator {id} does not exist")
-        if annotator.isadmin:
-            raise ValueError("Cannot delete admin annotator")
-        annotator.datasets = []
+    try:
+        with db.session.begin():
+            # check if the annotator exists
+            annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
+            if not annotator:
+                raise ValueError(f"Annotator {id} does not exist")
+            if annotator.isadmin:
+                raise ValueError("Cannot delete admin annotator")
+            annotator.datasets = []
 
-        with open(paths.LOGIN_CONFIG_PATH) as file:
-            config = yaml.load(file, Loader=SafeLoader)
+            with open(paths.LOGIN_CONFIG_PATH) as file:
+                config = yaml.load(file, Loader=SafeLoader)
 
-        config_copy = config.copy()
-        # delete the annotator from the login config
-        del config["credentials"]["usernames"][annotator.username]
-        if annotator.ispreauthorized:
-            config["preauthorized"]["emails"].remove(annotator.email)
-        with open(paths.LOGIN_CONFIG_PATH, "w") as file:
-            yaml.dump(config, file, default_flow_style=False)
-        try:
-            db.session.query(Annotator).filter(Annotator.id == id).delete()
-            db.session.commit()
-        except Exception as e:
-            app_logger.error(f"POSTGRES: Failed to delete annotator {id}")
-            app_logger.error(e)
-            # restore the annotator in the login config
+            config_copy = config.copy()
+            # delete the annotator from the login config
+            del config["credentials"]["usernames"][annotator.username]
+            if annotator.ispreauthorized:
+                config["preauthorized"]["emails"].remove(annotator.email)
             with open(paths.LOGIN_CONFIG_PATH, "w") as file:
-                yaml.dump(config_copy, file, default_flow_style=False)
-            raise e
+                yaml.dump(config, file, default_flow_style=False)
+            try:
+                db.session.query(Annotator).filter(Annotator.id == id).delete()
+                db.session.commit()
+            except Exception as e:
+                app_logger.error(f"POSTGRES: Failed to delete annotator {id}")
+                app_logger.error(e)
+                # restore the annotator in the login config
+                with open(paths.LOGIN_CONFIG_PATH, "w") as file:
+                    yaml.dump(config_copy, file, default_flow_style=False)
+                raise e
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_annotator_by_id(id: int) -> Annotator:
@@ -396,15 +431,19 @@ def get_annotator_by_id(id: int) -> Annotator:
         Annotator: The annotator.
     """
     app_logger.debug(f"POSTGRES: Getting annotator {id}")
-    with db.session.begin():
-        # check if the annotator exists
-        annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
-        if not annotator:
-            raise ValueError(f"Annotator {id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the annotator exists
+            annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
+            if not annotator:
+                raise ValueError(f"Annotator {id} does not exist")
 
-        annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
-        db.session.commit()
-    return annotator
+            annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
+            db.session.commit()
+        return annotator
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_annotator_by_username(username: str) -> Annotator:
@@ -417,15 +456,19 @@ def get_annotator_by_username(username: str) -> Annotator:
         Annotator: The annotator.
     """
     app_logger.debug(f"POSTGRES: Getting annotator {username}")
-    with db.session.begin():
-        # check if the annotator exists
-        annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
-        if not annotator:
-            raise ValueError(f"Annotator {username} does not exist")
+    try:
+        with db.session.begin():
+            # check if the annotator exists
+            annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
+            if not annotator:
+                raise ValueError(f"Annotator {username} does not exist")
 
-        annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
-        db.session.commit()
-    return annotator
+            annotator = db.session.query(Annotator).filter(Annotator.username == username).first()
+            db.session.commit()
+        return annotator
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def assign_annotator_to_dataset(annotator_id: int, dataset_id: int) -> None:
@@ -436,23 +479,27 @@ def assign_annotator_to_dataset(annotator_id: int, dataset_id: int) -> None:
         annotator_id (int): The annotator id to assign.
     """
     app_logger.debug(f"POSTGRES: Assigning dataset {dataset_id} to annotator {annotator_id}")
-    with db.session.begin():
-        # check if the dataset exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {dataset_id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the dataset exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {dataset_id} does not exist")
 
-        # check if the annotator exists
-        annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
-        if not annotator:
-            raise ValueError(f"Annotator {annotator_id} does not exist")
+            # check if the annotator exists
+            annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
+            if not annotator:
+                raise ValueError(f"Annotator {annotator_id} does not exist")
 
-        # check if the annotator already has the dataset assigned
-        if dataset in annotator.datasets:
-            raise ValueError(f"Annotator {annotator_id} already has dataset {dataset_id} assigned")
+            # check if the annotator already has the dataset assigned
+            if dataset in annotator.datasets:
+                raise ValueError(f"Annotator {annotator_id} already has dataset {dataset_id} assigned")
 
-        annotator.datasets.append(dataset)
-        db.session.commit()
+            annotator.datasets.append(dataset)
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_datasets_of_annotator(annotator_id: int) -> List[Dataset]:
@@ -465,17 +512,21 @@ def get_datasets_of_annotator(annotator_id: int) -> List[Dataset]:
         List[Dataset]: The datasets of the annotator.
     """
     app_logger.debug(f"POSTGRES: Getting datasets of annotator {annotator_id}")
-    with db.session.begin():
-        # check if the annotator exists
-        annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
-        if not annotator:
-            raise ValueError(f"Annotator {annotator_id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the annotator exists
+            annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
+            if not annotator:
+                raise ValueError(f"Annotator {annotator_id} does not exist")
 
-        datasets = annotator.datasets
-        # discard datasets with id 38 and 7
-        datasets = [dataset for dataset in datasets if dataset.id not in [38, 7]]  ## TODO: remove this when we need these dataset
-        db.session.commit()
-    return datasets
+            datasets = annotator.datasets
+            # discard datasets with id 38 and 7
+            datasets = [dataset for dataset in datasets if dataset.id not in [38, 7]]  ## TODO: remove this when we need these dataset
+            db.session.commit()
+        return datasets
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_latest_sample_of_annotator(annotator_id: int, dataset_id: int) -> Sample:
@@ -488,28 +539,32 @@ def get_latest_sample_of_annotator(annotator_id: int, dataset_id: int) -> Sample
         Sample: The latest sample of the annotator.
     """
     app_logger.debug(f"POSTGRES: Getting latest sample of annotator {annotator_id}")
-    with db.session.begin():
-        # check if the annotator exists
-        annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
-        if not annotator:
-            raise ValueError(f"Annotator {annotator_id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the annotator exists
+            annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
+            if not annotator:
+                raise ValueError(f"Annotator {annotator_id} does not exist")
 
-        # check if the dataset exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {dataset_id} does not exist")
-        # get the latest sample of the annotator
-        sample = (
-            db.session.query(Sample)
-            .join(Annotation, Sample.id == Annotation.sample_id)
-            .join(Annotator, Annotation.annotator_id == Annotator.id)
-            .filter(Sample.dataset_id == dataset_id)
-            .filter(Annotator.id == annotator_id)
-            .order_by(Annotation.created_at.desc())
-            .first()
-        )
-        db.session.commit()
-    return sample
+            # check if the dataset exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {dataset_id} does not exist")
+            # get the latest sample of the annotator
+            sample = (
+                db.session.query(Sample)
+                .join(Annotation, Sample.id == Annotation.sample_id)
+                .join(Annotator, Annotation.annotator_id == Annotator.id)
+                .filter(Sample.dataset_id == dataset_id)
+                .filter(Annotator.id == annotator_id)
+                .order_by(Annotation.created_at.desc())
+                .first()
+            )
+            db.session.commit()
+        return sample
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def update_annotator(id: int, **kwargs) -> None:
@@ -520,16 +575,21 @@ def update_annotator(id: int, **kwargs) -> None:
         **kwargs: The fields to update.
     """
     app_logger.debug(f"POSTGRES: Updating annotator {id}")
-    with db.session.begin():
-        # check if the annotator exists
-        annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
-        if not annotator:
-            raise ValueError(f"Annotator {id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the annotator exists
+            annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
+            if not annotator:
+                raise ValueError(f"Annotator {id} does not exist")
 
-        db.session.query(Annotator).filter(Annotator.id == id).update(kwargs)
-        db.session.commit()
-        # return the updated annotator
-        annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
+            db.session.query(Annotator).filter(Annotator.id == id).update(kwargs)
+            db.session.commit()
+            # return the updated annotator
+            annotator = db.session.query(Annotator).filter(Annotator.id == id).first()
+        return annotator
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 ########################
@@ -544,10 +604,14 @@ def list_annotations() -> List[Annotation]:
         List[Annotation]: The list of annotations.
     """
     app_logger.debug(f"POSTGRES: Listing annotations")
-    with db.session.begin():
-        annotations = db.session.query(Annotation).all()
-        db.session.commit()
-    return annotations
+    try:
+        with db.session.begin():
+            annotations = db.session.query(Annotation).all()
+            db.session.commit()
+        return annotations
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 ########################
@@ -563,14 +627,18 @@ def update_sample(id: int, **kwargs) -> None:
         **kwargs: The fields to update.
     """
     app_logger.debug(f"POSTGRES: Updating sample {id}")
-    with db.session.begin():
-        # check if the sample exists
-        sample = db.session.query(Sample).filter(Sample.id == id).first()
-        if not sample:
-            raise ValueError(f"Sample {id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the sample exists
+            sample = db.session.query(Sample).filter(Sample.id == id).first()
+            if not sample:
+                raise ValueError(f"Sample {id} does not exist")
 
-        db.session.query(Sample).filter(Sample.id == id).update(kwargs)
-        db.session.commit()
+            db.session.query(Sample).filter(Sample.id == id).update(kwargs)
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def delete_sample(id: int) -> None:
@@ -580,14 +648,18 @@ def delete_sample(id: int) -> None:
         id (int): The sample id to delete.
     """
     app_logger.debug(f"POSTGRES: Deleting sample {id}")
-    with db.session.begin():
-        # check if the sample exists
-        sample = db.session.query(Sample).filter(Sample.id == id).first()
-        if not sample:
-            raise ValueError(f"Sample {id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the sample exists
+            sample = db.session.query(Sample).filter(Sample.id == id).first()
+            if not sample:
+                raise ValueError(f"Sample {id} does not exist")
 
-        db.session.query(Sample).filter(Sample.id == id).delete()
-        db.session.commit()
+            db.session.query(Sample).filter(Sample.id == id).delete()
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def list_samples(dataset_id: int, top_k: int = None) -> List[Sample]:
@@ -600,17 +672,21 @@ def list_samples(dataset_id: int, top_k: int = None) -> List[Sample]:
         List[Sample]: The list of samples.
     """
     app_logger.debug(f"POSTGRES: Listing samples for dataset {dataset_id}")
-    with db.session.begin():
-        # check if the dataset already exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {dataset_id} does not exist")
-        if top_k:
-            samples = db.session.query(Sample).filter(Sample.dataset_id == dataset_id).limit(top_k).all()
-        else:
-            samples = db.session.query(Sample).filter(Sample.dataset_id == dataset_id).all()
+    try:
+        with db.session.begin():
+            # check if the dataset already exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {dataset_id} does not exist")
+            if top_k:
+                samples = db.session.query(Sample).filter(Sample.dataset_id == dataset_id).limit(top_k).all()
+            else:
+                samples = db.session.query(Sample).filter(Sample.dataset_id == dataset_id).all()
 
-    return samples
+        return samples
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def get_sample_by_id(id: int) -> Sample:
@@ -623,42 +699,54 @@ def get_sample_by_id(id: int) -> Sample:
         Sample: The sample.
     """
     app_logger.debug(f"POSTGRES: Getting sample {id}")
-    with db.session.begin():
-        # check if the sample exists
-        sample = db.session.query(Sample).filter(Sample.id == id).first()
-        if not sample:
-            raise ValueError(f"Sample {id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the sample exists
+            sample = db.session.query(Sample).filter(Sample.id == id).first()
+            if not sample:
+                raise ValueError(f"Sample {id} does not exist")
 
-    return sample
+        return sample
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def lock_sample(id: int) -> bool:
     # set param islocked to true
     app_logger.debug(f"POSTGRES: Locking sample {id}")
-    with db.session.begin():
-        # check if the sample exists
-        sample = db.session.query(Sample).filter(Sample.id == id).first()
-        if not sample:
-            raise ValueError(f"Sample {id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the sample exists
+            sample = db.session.query(Sample).filter(Sample.id == id).first()
+            if not sample:
+                raise ValueError(f"Sample {id} does not exist")
 
-        sample.islocked = True
-        sample.locked_at = datetime.now()
-        db.session.commit()
-    return True
+            sample.islocked = True
+            sample.locked_at = datetime.now()
+            db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def unlock_sample(id: int) -> bool:
     # set param islocked to false
     app_logger.debug(f"POSTGRES: Unlocking sample {id}")
-    with db.session.begin():
-        # check if the sample exists
-        sample = db.session.query(Sample).filter(Sample.id == id).first()
-        if not sample:
-            raise ValueError(f"Sample {id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the sample exists
+            sample = db.session.query(Sample).filter(Sample.id == id).first()
+            if not sample:
+                raise ValueError(f"Sample {id} does not exist")
 
-        sample.islocked = False
-        db.session.commit()
-    return True
+            sample.islocked = False
+            db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def annotate_sample(
@@ -688,53 +776,61 @@ def annotate_sample(
         **kwargs: The fields to update.
     """
     app_logger.debug(f"POSTGRES: Annotating sample {sample_id}")
-    with db.session.begin():
-        # check if the sample exists
-        sample = db.session.query(Sample).filter(Sample.id == sample_id).first()
-        if not sample:
-            raise ValueError(f"Sample {sample_id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the sample exists
+            sample = db.session.query(Sample).filter(Sample.id == sample_id).first()
+            if not sample:
+                raise ValueError(f"Sample {sample_id} does not exist")
 
-        # check if the annotator exists
-        annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
-        if not annotator:
-            raise ValueError(f"Annotator {annotator_id} does not exist")
+            # check if the annotator exists
+            annotator = db.session.query(Annotator).filter(Annotator.id == annotator_id).first()
+            if not annotator:
+                raise ValueError(f"Annotator {annotator_id} does not exist")
 
-        # create annotation
-        annotation = Annotation(
-            sample_id=sample_id,
-            annotator_id=annotator_id,
-            final_text=final_text,
-            final_sentence_type=final_sentence_type,
-            isRepeated=isRepeated,
-            # isAccentRight=isAccentRight,
-            # isPronunciationRight=isPronunciationRight,
-            # isClean=isClean,
-            # isPausesRight=isPausesRight,
-            # isSpeedRight=isSpeedRight,
-            # isConsisent=isConsisent,
-            incorrectProsody=incorrectProsody,
-            inconsistentTextAudio=inconsistentTextAudio,
-            incorrectTrancuation=incorrectTrancuation,
-            soundArtifacts=soundArtifacts,
-            feedback=feedback,
-            status=Status(status),
-        )
-        db.session.add(annotation)
-        db.session.commit()
+            # create annotation
+            annotation = Annotation(
+                sample_id=sample_id,
+                annotator_id=annotator_id,
+                final_text=final_text,
+                final_sentence_type=final_sentence_type,
+                isRepeated=isRepeated,
+                # isAccentRight=isAccentRight,
+                # isPronunciationRight=isPronunciationRight,
+                # isClean=isClean,
+                # isPausesRight=isPausesRight,
+                # isSpeedRight=isSpeedRight,
+                # isConsisent=isConsisent,
+                incorrectProsody=incorrectProsody,
+                inconsistentTextAudio=inconsistentTextAudio,
+                incorrectTrancuation=incorrectTrancuation,
+                soundArtifacts=soundArtifacts,
+                feedback=feedback,
+                status=Status(status),
+            )
+            db.session.add(annotation)
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def correct_locked_times() -> bool:
     # if locked time is more than 30 minutes then unlock
     app_logger.debug(f"POSTGRES: Correcting locked times")
-    with db.session.begin():
-        # check if the sample exists
-        samples = db.session.query(Sample).filter(Sample.islocked == True).all()
-        for sample in samples:
-            if sample.locked_at:
-                if (datetime.now() - sample.locked_at).total_seconds() > float(os.getenv("MAX_LOCKING_MIN")) * 60:
-                    sample.islocked = False
-                    db.session.commit()
-    return True
+    try:
+        with db.session.begin():
+            # check if the sample exists
+            samples = db.session.query(Sample).filter(Sample.islocked == True).all()
+            for sample in samples:
+                if sample.locked_at:
+                    if (datetime.now() - sample.locked_at).total_seconds() > float(os.getenv("MAX_LOCKING_MIN")) * 60:
+                        sample.islocked = False
+                        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
@@ -748,48 +844,53 @@ def query_next_sample(dataset_id: int) -> Tuple[List[Sample], dict]:
     """
     correct_locked_times()
     # this should query the net sample with highest wer in which  there is no annotation yet by checking the annotation table
+
     app_logger.debug(f"POSTGRES: Listing samples for dataset {dataset_id}")
-    with db.session.begin():
-        # check if the dataset already exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {dataset_id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the dataset already exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {dataset_id} does not exist")
 
-        # join samples and annotations to get the next sample where wer>0.2
-        # the difference in  lenght of asr_tex and original text should be more than 5 percent of the original text
-        all = (
-            db.session.query(Sample, Annotation)
-            .outerjoin(Annotation, Sample.id == Annotation.sample_id)
-            .filter(Sample.dataset_id == dataset_id)
-            .filter(Sample.islocked != True)
-            .filter(Sample.is_selected_for_delivery == True)
-            # .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.02 * func.length(Sample.original_text))
-            .filter(
-                not_(
-                    (Sample.local_trimmed_path == None)
-                    | (Sample.local_path == None)
-                    | (Sample.s3TrimmedPath == None)
-                    | (Sample.s3RawPath == None)
-                    | (Sample.asr_text == None)
-                    | (Sample.trimmed_audio_duration == None)
+            # join samples and annotations to get the next sample where wer>0.2
+            # the difference in  lenght of asr_tex and original text should be more than 5 percent of the original text
+            all = (
+                db.session.query(Sample, Annotation)
+                .outerjoin(Annotation, Sample.id == Annotation.sample_id)
+                .filter(Sample.dataset_id == dataset_id)
+                .filter(Sample.islocked != True)
+                .filter(Sample.is_selected_for_delivery == True)
+                # .filter(func.length(Sample.asr_text) - func.length(Sample.original_text) > 0.02 * func.length(Sample.original_text))
+                .filter(
+                    not_(
+                        (Sample.local_trimmed_path == None)
+                        | (Sample.local_path == None)
+                        | (Sample.s3TrimmedPath == None)
+                        | (Sample.s3RawPath == None)
+                        | (Sample.asr_text == None)
+                        | (Sample.trimmed_audio_duration == None)
+                    )
                 )
+                .order_by(Sample.wer.desc())
+                .all()
             )
-            .order_by(Sample.wer.desc())
-            .all()
-        )
 
-        # filter out the samples that have been annotated
-        samples = [sample for sample, annotation in all if annotation is None]
+            # filter out the samples that have been annotated
+            samples = [sample for sample, annotation in all if annotation is None]
 
-        # number of samples that have been annotated
-        annotated = len(all) - len(samples)
+            # number of samples that have been annotated
+            annotated = len(all) - len(samples)
 
-        # number of samples that have not been annotated
-        not_annotated = len(samples)
+            # number of samples that have not been annotated
+            not_annotated = len(samples)
 
-    if len(samples) == 0:
-        return None, {"annotated": annotated, "not_annotated": not_annotated, "total": annotated + not_annotated}
-    return samples[0], {"annotated": annotated, "not_annotated": not_annotated, "total": annotated + not_annotated}
+        if len(samples) == 0:
+            return None, {"annotated": annotated, "not_annotated": not_annotated, "total": annotated + not_annotated}
+        return samples[0], {"annotated": annotated, "not_annotated": not_annotated, "total": annotated + not_annotated}
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 def insert_sample(
@@ -817,61 +918,65 @@ def insert_sample(
     s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"))
 
     app_logger.debug(f"POSTGRES: Inserting sample for dataset {dataset_id}")
-    with db.session.begin():
-        # check if the dataset already exists
-        dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
-        if not dataset:
-            raise ValueError(f"Dataset {dataset_id} does not exist")
+    try:
+        with db.session.begin():
+            # check if the dataset already exists
+            dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
+            if not dataset:
+                raise ValueError(f"Dataset {dataset_id} does not exist")
 
-        if not os.path.exists(audio_path):
-            raise ValueError(f"Audio file {audio_path} does not exist. Please check the path.")
+            if not os.path.exists(audio_path):
+                raise ValueError(f"Audio file {audio_path} does not exist. Please check the path.")
 
-        objectkey = os.path.join(dataset_dir, dataset_name, "raw", audio_path)
-        local_path = os.path.join(str(paths.LOCAL_BUCKET_DIR.resolve()), objectkey)
-        # preprocess the audio file
-        meta = evaluate_audio(audio_path)
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filename = os.path.basename(audio_path)
-            # copy the file to the temp directory
-            shutil.copy(audio_path, local_path)
-            if meta["is_88khz"] == False:
-                convert_to_88k(local_path, local_path)
+            objectkey = os.path.join(dataset_dir, dataset_name, "raw", audio_path)
+            local_path = os.path.join(str(paths.LOCAL_BUCKET_DIR.resolve()), objectkey)
+            # preprocess the audio file
+            meta = evaluate_audio(audio_path)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                filename = os.path.basename(audio_path)
+                # copy the file to the temp directory
+                shutil.copy(audio_path, local_path)
+                if meta["is_88khz"] == False:
+                    convert_to_88k(local_path, local_path)
 
-            if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
-                normalize_audio(local_path, local_path)
+                if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
+                    normalize_audio(local_path, local_path)
 
-            if meta["isPCM"] == False:
-                convert_to_s16le(local_path, local_path)
+                if meta["isPCM"] == False:
+                    convert_to_s16le(local_path, local_path)
 
-            meta = evaluate_audio(local_path)
+                meta = evaluate_audio(local_path)
 
-            sample = Sample(
-                dataset_id=dataset_id,
-                deliverable=deliverable,
-                filename=filename,
-                local_path=local_path,
-                original_text=text,
-                asr_text=None,
-                duration=meta["duration"],
-                trim_start=None,
-                trim_end=None,
-                trimmed_audio_duration=None,
-                sentence_type=sentence_type,
-                sentence_length=sentence_length,
-                sampling_rate=meta["sampling_rate"],
-                sample_format=meta["sample_format"],
-                isPCM=meta["isPCM"],
-                n_channel=meta["n_channel"],
-                format=meta["format"],
-                peak_volume_db=meta["peak_volume_db"],
-                size=meta["size"],
-                isValid=meta["isValid"],
-                wer=None,
-            )
+                sample = Sample(
+                    dataset_id=dataset_id,
+                    deliverable=deliverable,
+                    filename=filename,
+                    local_path=local_path,
+                    original_text=text,
+                    asr_text=None,
+                    duration=meta["duration"],
+                    trim_start=None,
+                    trim_end=None,
+                    trimmed_audio_duration=None,
+                    sentence_type=sentence_type,
+                    sentence_length=sentence_length,
+                    sampling_rate=meta["sampling_rate"],
+                    sample_format=meta["sample_format"],
+                    isPCM=meta["isPCM"],
+                    n_channel=meta["n_channel"],
+                    format=meta["format"],
+                    peak_volume_db=meta["peak_volume_db"],
+                    size=meta["size"],
+                    isValid=meta["isValid"],
+                    wer=None,
+                )
 
-            db.session.add(sample)
-            s3.upload_file(local_path, bucket_name, objectkey)
-            db.session.commit()
+                db.session.add(sample)
+                s3.upload_file(local_path, bucket_name, objectkey)
+                db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        raise e
 
 
 from sqlalchemy.orm import Session
