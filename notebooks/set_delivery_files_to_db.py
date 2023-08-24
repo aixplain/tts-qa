@@ -62,6 +62,15 @@ for dataset_str in [
     # create cursor
     cur = conn.cursor()
 
+    sql_script = f"""
+        UPDATE sample
+    SET is_selected_for_delivery = FALSE
+    WHERE dataset_id IN (SELECT id FROM dataset WHERE name = '{dataset_str}');
+    """
+
+    cur.execute(sql_script)
+    conn.commit()
+
     # update all samples to is_seslected_for_delivery = true
     for filename in tqdm(filenames):
         cur.execute(

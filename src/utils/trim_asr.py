@@ -16,6 +16,7 @@ from concurrent.futures import as_completed, ThreadPoolExecutor  # noqa: F401
 from pathlib import Path
 
 import boto3
+import botocore
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -51,7 +52,11 @@ engine = create_engine(POSTGRES_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"))
+
+client_config = botocore.config.Config(max_pool_connections=50)
+s3 = boto3.client(
+    "s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"), config=client_config
+)
 bucket_name = os.environ.get("S3_BUCKET_NAME")
 dataset_dir = os.environ.get("S3_DATASET_DIR")
 
@@ -162,6 +167,7 @@ def trim_and_asr_(sample, language):
     sample.longest_pause = round(float(response["longest_pause"]), 2)
     sample.wer = round(float(utils.calculate_wer(sample.original_text.lower(), str(asr).lower())), 2)
     sample.uncased_unpunctuated_wer = round(float(wer_wo_punctuation(sample.original_text.lower(), str(asr).lower())), 2)
+    return sample
 
 
 def asr_only_(sample, language):
@@ -176,7 +182,6 @@ def asr_only_(sample, language):
 
 def process_datasets():
     datasets = session.query(Dataset).all()
-
     for dataset in datasets:
         if "English (Alyssa)" in dataset.name:
             continue
@@ -254,5 +259,7 @@ def process_datasets():
 
 
 if __name__ == "__main__":
+    app_logger.info("Starting to process all datasets")
     process_datasets()
+    session.close()
     app_logger.info("Finished processing all datasets")
