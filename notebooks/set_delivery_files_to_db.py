@@ -27,7 +27,7 @@ db_name = os.getenv("POSTGRES_DB")
 db_user = os.getenv("POSTGRES_USER")
 db_password = os.getenv("POSTGRES_PWD")
 
-total_hours = 20
+total_hours = 30
 include_extras = False
 
 from tqdm import tqdm
