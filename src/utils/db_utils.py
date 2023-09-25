@@ -18,7 +18,7 @@ from yaml.loader import SafeLoader
 
 from src.logger import root_logger
 from src.paths import paths
-from src.service.models import Annotation, Annotator, Dataset, Sample, Status  # noqa: F401
+from src.service.models import Annotation, Annotator, annotator_dataset, Dataset, Sample, Status  # noqa: F401
 from src.utils.audio import convert_to_88k, convert_to_mono, convert_to_s16le, evaluate_audio, normalize_audio, trim_audio  # noqa: F401
 
 
@@ -402,11 +402,17 @@ def delete_annotator(id: int) -> None:
             config_copy = config.copy()
             # delete the annotator from the login config
             del config["credentials"]["usernames"][annotator.username]
-            if annotator.ispreauthorized:
-                config["preauthorized"]["emails"].remove(annotator.email)
             with open(paths.LOGIN_CONFIG_PATH, "w") as file:
                 yaml.dump(config, file, default_flow_style=False)
             try:
+                # delete annotator_dataset table
+                try:
+                    db.session.query(annotator_dataset).filter(annotator_dataset.c.annotator_id == id).delete()
+                    db.session.commit()
+                except Exception as e:
+                    app_logger.error(f"POSTGRES: Failed to delete annotator_dataset table for annotator {id}")
+                    app_logger.error(e)
+                # delete the annotator from the database
                 db.session.query(Annotator).filter(Annotator.id == id).delete()
                 db.session.commit()
             except Exception as e:

@@ -74,7 +74,7 @@ with st.sidebar:
                         if response.status_code == 200:
                             response: str = response.json()  # type: ignore
                             if "message" in response:  # type: ignore
-                                st.error(response["message"])  # type: ignore
+                                st.error(response["error"])  # type: ignore
                             else:
                                 st.success("User created successfully")
 
@@ -125,10 +125,10 @@ with st.sidebar:
                     response = requests.delete(f"{BACKEND_URL}/annotators/{annotator_id}")
                     if response.status_code == 200:
                         response = response.json()
-                        if "message" in response and response["message"] != "Failed":  # type: ignore
-                            st.error(response["error"])  # type: ignore
-                        else:
+                        if response["message"] == "Success":  # type: ignore
                             st.success(f"User {annotator_selected} deleted")
+                        else:
+                            st.error(response["error"])  # type: ignore
                     else:
                         st.error("Something went wrong")
             except Exception as e:
