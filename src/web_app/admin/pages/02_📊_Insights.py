@@ -174,11 +174,19 @@ def app():
             st.dataframe(comparison_table)
 
             st.subheader("Feedback Analysis")
-            wordcloud = WordCloud(background_color="white").generate(" ".join(annotations["feedback"].dropna()))
-            fig, ax = plt.subplots()
-            ax.imshow(wordcloud, interpolation="bilinear")
-            ax.axis("off")
-            st.pyplot(fig)
+            # check if there is any feedback
+            feedbacks = " ".join(annotations["feedback"].dropna())
+
+            # remove the space from the feedbacks
+            feedbacks = feedbacks.replace(" ", "")
+            if feedbacks != "":
+                wordcloud = WordCloud(background_color="white").generate(feedbacks)
+                fig, ax = plt.subplots()
+                ax.imshow(wordcloud, interpolation="bilinear")
+                ax.axis("off")
+                st.pyplot(fig)
+            else:
+                st.warning("No feedback found for this dataset")
         else:
             st.warning("No annotations found for this dataset")
 

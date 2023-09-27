@@ -102,7 +102,7 @@ def query_next_sample(id: int) -> dict:
     try:
         sample, stats = db_utils.query_next_sample(id)
         if sample is None:
-            return {"message": "No more samples"}
+            return {"sample": None, "stats": stats}
         return {"sample": SampleModel(**sample.to_dict()), "stats": stats}  # type: ignore
     except Exception as e:
         return {"message": "Failed", "error": str(e)}

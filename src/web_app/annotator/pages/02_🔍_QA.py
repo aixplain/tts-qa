@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 
 import pandas as pd
 import requests
@@ -175,11 +176,7 @@ def app():
         st.session_state["datasets"] = datasets
 
     if "stats" not in st.session_state:
-        st.session_state["stats"] = {
-            "total": 0,
-            "annotated": 0,
-            "not_annotated": 0,
-        }
+        st.session_state["stats"] = None
 
     def annotate_sample(
         id: int,
@@ -248,42 +245,45 @@ def app():
 
                     st.session_state["sample"] = None
                     st.session_state["stats"] = None
-                    app_logger.error(f"Failed to get next sample. Error: {response['error']}")
-                    return
+                    if "error" in response:
+                        app_logger.error(f"Failed to get next sample. Error: {response['error']}")
+                        return
+
                 sample = response["sample"]
                 stats = response["stats"]
                 st.session_state["sample"] = sample
                 st.session_state["stats"] = stats
-                st.session_state["user_input"] = {
-                    "final_text": sample["original_text"],
-                    "final_sentence_type": sample["sentence_type"],
-                    "isRepeated": True,
-                    # "isAccentRight": False,
-                    # "isPronunciationRight": False,
-                    # "isClean": False,
-                    # "isPausesRight": False,
-                    # "isSpeedRight": False,
-                    # "isConsisent": False,
-                    "incorrectProsody": True,
-                    "inconsistentTextAudio": True,
-                    "incorrectTrancuation": True,
-                    "soundArtifacts": True,
-                    "feedback": "",
-                    "status": "NotReviewed",
-                }
+                if sample is not None:
+                    st.session_state["user_input"] = {
+                        "final_text": sample["original_text"],
+                        "final_sentence_type": sample["sentence_type"],
+                        "isRepeated": True,
+                        # "isAccentRight": False,
+                        # "isPronunciationRight": False,
+                        # "isClean": False,
+                        # "isPausesRight": False,
+                        # "isSpeedRight": False,
+                        # "isConsisent": False,
+                        "incorrectProsody": True,
+                        "inconsistentTextAudio": True,
+                        "incorrectTrancuation": True,
+                        "soundArtifacts": True,
+                        "feedback": "",
+                        "status": "NotReviewed",
+                    }
 
-                # lock the sample
+                    # lock the sample
 
-                response = requests.put(BACKEND_URL + f"/samples/{sample['id']}/lock")
-                if response.status_code == 200:
-                    app_logger.info(f"Sample {sample['id']} locked")
-                st.session_state["query_button"] = False
-                app_logger.info("Next sample retrieved")
+                    response = requests.put(BACKEND_URL + f"/samples/{sample['id']}/lock")
+                    if response.status_code == 200:
+                        app_logger.info(f"Sample {sample['id']} locked")
+                    st.session_state["query_button"] = False
+                    app_logger.info("Next sample retrieved")
             else:
                 st.error(f"Failed to get next sample, status code: {response.status_code}")
                 app_logger.error(f"Failed to get next sample, status code: {response.status_code}")
         except Exception as e:
-            app_logger.error(e)
+            app_logger.error(f"Failed to get next sample. Error: {traceback.format_exc()}")
 
     if st.button("See Latest Annotation"):
         # @router.get("/{id}/samples/latest")
