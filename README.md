@@ -53,7 +53,7 @@ uvicorn src.service.api:app --port 8089 --reload
 ```
 
 ## Start WebApp Frontend
-Please note that the previous services need to be running properly for the web app to work.
+Please note that the previous services need to be running properly for the web app to work. Moreover, each of them needs to be run on separate terminals. It is advised to open tmux sessions for each of these services.
 
 ### 1. Annotator
 You may use the following command to run the annotator app while in the project root directory.
