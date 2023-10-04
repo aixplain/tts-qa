@@ -53,7 +53,7 @@ uvicorn src.service.api:app --port 8089 --reload
 ```
 
 ## Start WebApp Frontend
-Please note that the previous services need to be running properly for the web app to work. Moreover, each of them needs to be run on separate terminals. It is advised to open tmux sessions for each of these services.
+Please note that the previous services need to be running properly for the web app to work.
 
 ### 1. Annotator
 You may use the following command to run the annotator app while in the project root directory.
@@ -68,6 +68,12 @@ You may use the following command to run the admin app while in the project root
 python -m streamlit run --server.port 8502  --server.maxUploadSize 8192 ./tts-qa/src/web_app/admin/🏠_Intro_admin.py
 ```
 You may choose open ports of your choice.
+
+You can upload a csv file containing the text and a zip file containing recordings. Example file may be downloaded from the frontend to see the format. Moreover, you may also extract the start and end ids of the recordings from the file names by providing a regex filter to extract those. After uploading the corresponding files, the processing will start. Once the initial processing end (visible through celery), you will need to start the trimming script using.
+```
+python ./tts-qa/src/utils/trim_asr.py
+```
+
 
 ### How to dump and restore the database
 
