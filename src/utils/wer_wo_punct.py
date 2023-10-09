@@ -1,7 +1,8 @@
 import os
 
-
-os.environ["TEAM_API_KEY"] = "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8"
+from src.paths import paths
+from dotenv import find_dotenv, load_dotenv
+load_dotenv(find_dotenv(paths.PROJECT_ROOT_DIR / "vars.env"), override=True)
 
 import sys
 from concurrent.futures import ThreadPoolExecutor  # noqa: F401
