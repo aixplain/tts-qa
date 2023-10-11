@@ -1,0 +1,12 @@
+[tool.isort]
+profile = "black"
+line_length = 160
+lines_after_imports = 2
+force_alphabetical_sort_within_sections = true
+known_third_party = ["wandb"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::FutureWarning",
+    "ignore::UserWarning",
+]

@@ -1,0 +1,10 @@
+Generic single-database configuration.
+
+# How to use it
+1. Create a new database and a new user for it.
+2. Copy this file to alembic.ini and edit it.
+3. Run "alembic upgrade head" to create the tables.
+4. Run "alembic revision --autogenerate -m "message"" to generate a new revision.
+5. Run "alembic upgrade head" to apply the new revision.
+6. Modify the models in models.py.
+7. Go to step 4.
