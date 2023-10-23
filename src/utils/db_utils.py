@@ -403,7 +403,7 @@ def create_annotator(username: str, name: str, email: str, password: str, isprea
                 datasets = db.session.query(Dataset).all()
                 for dataset in datasets:
                     annotator.datasets.append(dataset)
-                db.session.commit()
+            db.session.commit()
         except Exception as e:
             app_logger.error(f"POSTGRES: Failed to create annotator {username}")
             app_logger.error(e)
