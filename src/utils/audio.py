@@ -1,18 +1,32 @@
 import os
-from src.paths import paths
+
 from dotenv import find_dotenv, load_dotenv
+
+from src.paths import paths
+
+
 load_dotenv(find_dotenv(paths.PROJECT_ROOT_DIR / "vars.env"), override=True)
 
+import os
+import tempfile
 import time
+from copy import deepcopy
 
 import librosa
+import numpy as np
 import pandas as pd
+import scipy.io.wavfile as wav
+import scipy.signal as signal
 import soundfile as sf
+import torch
 from aixplain.factories.model_factory import ModelFactory
 from pyannote.audio import Model
 from pyannote.audio.pipelines import VoiceActivityDetection
 from pydub import AudioSegment
 from pydub.utils import mediainfo
+
+
+torch.set_num_threads(1)
 
 
 modelPyannote = Model.from_pretrained("pyannote/segmentation", use_auth_token="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")
@@ -312,3 +326,129 @@ def convert_to_s16le(path, out_path):
     s16le_sound = sound.set_sample_width(2)
     s16le_sound.export(out_path, format="wav")
     return out_path
+
+
+class CustomVAD:
+    SAMPLING_RATE = 16000
+    PADDING = 0.025
+    ENERGY_THRESHOLD = 500000
+    WINDOW_SIZE = 0.02
+
+    def __init__(self, pyannote_model_path, silero_model_path, hyper_parameters=None):
+        self.pyannote_model = Model.from_pretrained(pyannote_model_path, use_auth_token="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")
+        self.silero_model, self.silero_utils = torch.hub.load(repo_or_dir=silero_model_path, model="silero_vad", force_reload=True, onnx=False)
+        self.pipeline = VoiceActivityDetection(segmentation=self.pyannote_model)
+        if hyper_parameters is None:
+            hyper_parameters = {"onset": 0.5, "offset": 0.5, "min_duration_on": 0.0, "min_duration_off": 0.05}
+        self.pipeline.instantiate(hyper_parameters)
+
+        (self.get_speech_timestamps, self.save_audio, self.read_audio, self.VADIterator, self.collect_chunks) = self.silero_utils
+
+    @staticmethod
+    def pad(waveform, segment):
+        start, end = segment
+        start = max(0, start - CustomVAD.PADDING)
+        end = min(len(waveform) / CustomVAD.SAMPLING_RATE, end + CustomVAD.PADDING)
+        return start, end
+
+    def run_pyannote_vad(self, file):
+        vad_segments = self.pipeline(file)
+        pyannote_timeline = vad_segments.get_timeline().support()
+        response_timeline = [(segment.start, segment.end) for segment in pyannote_timeline]
+        # get start of first and end of last
+        if len(response_timeline) > 0:
+            start = response_timeline[0][0]
+            end = response_timeline[-1][1]
+        else:
+            start = 0
+            end = 0
+        response_timeline = (start, end)
+        return response_timeline
+
+    def run_silero_vad(self, file):
+        wav = self.read_audio(file, sampling_rate=CustomVAD.SAMPLING_RATE)
+        silero_timeline = self.get_speech_timestamps(wav, self.silero_model, sampling_rate=CustomVAD.SAMPLING_RATE)
+        silero_timeline = [(segment["start"] / CustomVAD.SAMPLING_RATE, segment["end"] / CustomVAD.SAMPLING_RATE) for segment in silero_timeline]
+        # get start of first and end of last
+        if len(silero_timeline) > 0:
+            start = silero_timeline[0][0]
+            end = silero_timeline[-1][1]
+        else:
+            start = 0
+            end = 0
+        silero_timeline = (start, end)
+        return silero_timeline
+
+    def my_custom_vad(self, pyannote_segment, silero_segment, waveform):
+        merged_timeline = []
+        # Your logic for merging or comparing pyannote and silero timelines
+        pyannote_start, pyannote_end = list(deepcopy(pyannote_segment))
+        silero_start, silero_end = list(deepcopy(silero_segment))
+
+        # If the segments are close enough, merge them
+        if abs(pyannote_start - silero_start) < 0.05:
+            merged_start = min(pyannote_start, silero_start)
+        else:
+            # Divide the segment into smaller windows and check energy
+            start_start = min(pyannote_start, silero_start)
+            start_end = max(pyannote_start, silero_start)
+            merged_timeline = []
+            merged_start = start_end
+            num_windows = int((start_end - start_start) / CustomVAD.WINDOW_SIZE)
+            for i in range(num_windows):
+                window_start = int((start_start + i * CustomVAD.WINDOW_SIZE) * CustomVAD.SAMPLING_RATE)
+                window_end = int(window_start + CustomVAD.WINDOW_SIZE * CustomVAD.SAMPLING_RATE)
+                window_samples = waveform[window_start:window_end]
+                window_energy = np.sum(window_samples**2) / len(window_samples)
+
+                if window_energy > CustomVAD.ENERGY_THRESHOLD:
+                    merged_timeline.append((start_start + i * CustomVAD.WINDOW_SIZE, start_start + (i + 1) * CustomVAD.WINDOW_SIZE, window_energy))
+            if len(merged_timeline) > 0:
+                merged_start = merged_timeline[0][0]
+
+        if abs(pyannote_end - silero_end) < 0.05:
+            merged_end = max(pyannote_end, silero_end)
+        else:
+            end_start = min(pyannote_end, silero_end)
+            end_end = max(pyannote_end, silero_end)
+            merged_timeline = []
+            merged_end = end_start
+            num_windows = int((end_end - end_start) / CustomVAD.WINDOW_SIZE)
+            for i in range(num_windows):
+                window_start = int((end_start + i * CustomVAD.WINDOW_SIZE) * CustomVAD.SAMPLING_RATE)
+                window_end = int(window_start + CustomVAD.WINDOW_SIZE * CustomVAD.SAMPLING_RATE)
+                window_samples = waveform[window_start:window_end]
+                window_energy = np.sum(window_samples**2) / len(window_samples)
+
+                if window_energy > CustomVAD.ENERGY_THRESHOLD:
+                    merged_timeline.append((end_start + i * CustomVAD.WINDOW_SIZE, end_start + (i + 1) * CustomVAD.WINDOW_SIZE, window_energy))
+            if len(merged_timeline) > 0:
+                merged_end = merged_timeline[-1][1]
+
+        custom_segment = (merged_start, merged_end)
+
+        return custom_segment
+
+    def process_file(self, file):
+        audio = AudioSegment.from_file(file, format="wav")
+        waveform = np.array(audio.get_array_of_samples())
+        original_sampling_rate = audio.frame_rate
+        resampled_waveform = signal.resample(waveform, int(len(waveform) * CustomVAD.SAMPLING_RATE / original_sampling_rate))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_wav_file = os.path.join(temp_dir, "temp_audio.wav")
+            wav.write(temp_wav_file, CustomVAD.SAMPLING_RATE, resampled_waveform.astype("int16"))
+            pyannote_segment = self.run_pyannote_vad(file)
+            silero_segment = self.run_silero_vad(file)
+        print(pyannote_segment, silero_segment)
+        pyannote_segment = self.pad(resampled_waveform, pyannote_segment)
+        silero_segment = self.pad(resampled_waveform, silero_segment)
+
+        custom_segment = self.my_custom_vad(pyannote_segment, silero_segment, resampled_waveform)
+        custom_segment = self.pad(resampled_waveform, custom_segment)
+        response = {
+            "resampled_waveform": resampled_waveform,
+            "pyannote_segment": pyannote_segment,
+            "silero_segment": silero_segment,
+            "custom_segment": custom_segment,
+        }
+        return response
