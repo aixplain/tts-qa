@@ -1075,6 +1075,9 @@ def insert_sample(
             if meta["is_88khz"] == False:
                 convert_to_88k(local_path, local_path)
 
+            if meta["is_mono"] == False:
+                convert_to_mono(local_path, local_path)
+
             if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
                 normalize_audio(local_path, local_path)
 

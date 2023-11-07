@@ -439,7 +439,6 @@ class CustomVAD:
             wav.write(temp_wav_file, CustomVAD.SAMPLING_RATE, resampled_waveform.astype("int16"))
             pyannote_segment = self.run_pyannote_vad(file)
             silero_segment = self.run_silero_vad(file)
-        print(pyannote_segment, silero_segment)
         pyannote_segment = self.pad(resampled_waveform, pyannote_segment)
         silero_segment = self.pad(resampled_waveform, silero_segment)
 
