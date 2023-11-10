@@ -329,26 +329,53 @@ def convert_to_s16le(path, out_path):
 
 
 class CustomVAD:
-    SAMPLING_RATE = 16000
-    PADDING = 0.025
-    ENERGY_THRESHOLD = 500000
-    WINDOW_SIZE = 0.02
-
     def __init__(self, pyannote_model_path, silero_model_path, hyper_parameters=None):
         self.pyannote_model = Model.from_pretrained(pyannote_model_path, use_auth_token="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")
-        self.silero_model, self.silero_utils = torch.hub.load(repo_or_dir=silero_model_path, model="silero_vad", force_reload=True, onnx=False)
+        self.silero_model, self.silero_utils = torch.hub.load(
+            repo_or_dir=silero_model_path,
+            model="silero_vad",
+            force_reload=True,
+            onnx=False,
+        )
         self.pipeline = VoiceActivityDetection(segmentation=self.pyannote_model)
         if hyper_parameters is None:
-            hyper_parameters = {"onset": 0.5, "offset": 0.5, "min_duration_on": 0.0, "min_duration_off": 0.05}
+            hyper_parameters = {
+                "onset": 0.5,
+                "offset": 0.5,
+                "min_duration_on": 0.0,
+                "min_duration_off": 0.05,
+            }
         self.pipeline.instantiate(hyper_parameters)
 
-        (self.get_speech_timestamps, self.save_audio, self.read_audio, self.VADIterator, self.collect_chunks) = self.silero_utils
+        (
+            self.get_speech_timestamps,
+            self.save_audio,
+            self.read_audio,
+            self.VADIterator,
+            self.collect_chunks,
+        ) = self.silero_utils
 
-    @staticmethod
-    def pad(waveform, segment):
+        self.SAMPLING_RATE = 16000
+        self.PADDING = 0.025
+        self.ENERGY_THRESHOLD = 1_000_000
+        self.WINDOW_SIZE = 0.02
+
+    def set_energy_threshold(self, threshold):
+        self.ENERGY_THRESHOLD = threshold
+
+    def set_window_size(self, window_size):
+        self.WINDOW_SIZE = window_size
+
+    def set_padding(self, padding):
+        self.PADDING = padding
+
+    def set_sampling_rate(self, sampling_rate):
+        self.SAMPLING_RATE = sampling_rate
+
+    def pad(self, waveform, segment):
         start, end = segment
-        start = max(0, start - CustomVAD.PADDING)
-        end = min(len(waveform) / CustomVAD.SAMPLING_RATE, end + CustomVAD.PADDING)
+        start = max(0, start - self.PADDING)
+        end = min(len(waveform) / self.SAMPLING_RATE, end + self.PADDING)
         return start, end
 
     def run_pyannote_vad(self, file):
@@ -366,9 +393,15 @@ class CustomVAD:
         return response_timeline
 
     def run_silero_vad(self, file):
-        wav = self.read_audio(file, sampling_rate=CustomVAD.SAMPLING_RATE)
-        silero_timeline = self.get_speech_timestamps(wav, self.silero_model, sampling_rate=CustomVAD.SAMPLING_RATE)
-        silero_timeline = [(segment["start"] / CustomVAD.SAMPLING_RATE, segment["end"] / CustomVAD.SAMPLING_RATE) for segment in silero_timeline]
+        wav = self.read_audio(file, sampling_rate=self.SAMPLING_RATE)
+        silero_timeline = self.get_speech_timestamps(wav, self.silero_model, sampling_rate=self.SAMPLING_RATE)
+        silero_timeline = [
+            (
+                segment["start"] / self.SAMPLING_RATE,
+                segment["end"] / self.SAMPLING_RATE,
+            )
+            for segment in silero_timeline
+        ]
         # get start of first and end of last
         if len(silero_timeline) > 0:
             start = silero_timeline[0][0]
@@ -394,15 +427,21 @@ class CustomVAD:
             start_end = max(pyannote_start, silero_start)
             merged_timeline = []
             merged_start = start_end
-            num_windows = int((start_end - start_start) / CustomVAD.WINDOW_SIZE)
+            num_windows = int((start_end - start_start) / self.WINDOW_SIZE)
             for i in range(num_windows):
-                window_start = int((start_start + i * CustomVAD.WINDOW_SIZE) * CustomVAD.SAMPLING_RATE)
-                window_end = int(window_start + CustomVAD.WINDOW_SIZE * CustomVAD.SAMPLING_RATE)
+                window_start = int((start_start + i * self.WINDOW_SIZE) * self.SAMPLING_RATE)
+                window_end = int(window_start + self.WINDOW_SIZE * self.SAMPLING_RATE)
                 window_samples = waveform[window_start:window_end]
                 window_energy = np.sum(window_samples**2) / len(window_samples)
 
-                if window_energy > CustomVAD.ENERGY_THRESHOLD:
-                    merged_timeline.append((start_start + i * CustomVAD.WINDOW_SIZE, start_start + (i + 1) * CustomVAD.WINDOW_SIZE, window_energy))
+                if window_energy > self.ENERGY_THRESHOLD:
+                    merged_timeline.append(
+                        (
+                            start_start + i * self.WINDOW_SIZE,
+                            start_start + (i + 1) * self.WINDOW_SIZE,
+                            window_energy,
+                        )
+                    )
             if len(merged_timeline) > 0:
                 merged_start = merged_timeline[0][0]
 
@@ -413,15 +452,21 @@ class CustomVAD:
             end_end = max(pyannote_end, silero_end)
             merged_timeline = []
             merged_end = end_start
-            num_windows = int((end_end - end_start) / CustomVAD.WINDOW_SIZE)
+            num_windows = int((end_end - end_start) / self.WINDOW_SIZE)
             for i in range(num_windows):
-                window_start = int((end_start + i * CustomVAD.WINDOW_SIZE) * CustomVAD.SAMPLING_RATE)
-                window_end = int(window_start + CustomVAD.WINDOW_SIZE * CustomVAD.SAMPLING_RATE)
+                window_start = int((end_start + i * self.WINDOW_SIZE) * self.SAMPLING_RATE)
+                window_end = int(window_start + self.WINDOW_SIZE * self.SAMPLING_RATE)
                 window_samples = waveform[window_start:window_end]
                 window_energy = np.sum(window_samples**2) / len(window_samples)
 
-                if window_energy > CustomVAD.ENERGY_THRESHOLD:
-                    merged_timeline.append((end_start + i * CustomVAD.WINDOW_SIZE, end_start + (i + 1) * CustomVAD.WINDOW_SIZE, window_energy))
+                if window_energy > self.ENERGY_THRESHOLD:
+                    merged_timeline.append(
+                        (
+                            end_start + i * self.WINDOW_SIZE,
+                            end_start + (i + 1) * self.WINDOW_SIZE,
+                            window_energy,
+                        )
+                    )
             if len(merged_timeline) > 0:
                 merged_end = merged_timeline[-1][1]
 
@@ -431,12 +476,24 @@ class CustomVAD:
 
     def process_file(self, file):
         audio = AudioSegment.from_file(file, format="wav")
+        # If the audio is stereo, convert it to mono by averaging the channels
+
+        if audio.channels > 1:
+            audio = audio.set_channels(1)
+
         waveform = np.array(audio.get_array_of_samples())
         original_sampling_rate = audio.frame_rate
-        resampled_waveform = signal.resample(waveform, int(len(waveform) * CustomVAD.SAMPLING_RATE / original_sampling_rate))
+        resampled_waveform = signal.resample(
+            waveform,
+            int(len(waveform) * self.SAMPLING_RATE / original_sampling_rate),
+        )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_wav_file = os.path.join(temp_dir, "temp_audio.wav")
-            wav.write(temp_wav_file, CustomVAD.SAMPLING_RATE, resampled_waveform.astype("int16"))
+            wav.write(
+                temp_wav_file,
+                self.SAMPLING_RATE,
+                resampled_waveform.astype("int16"),
+            )
             pyannote_segment = self.run_pyannote_vad(file)
             silero_segment = self.run_silero_vad(file)
         pyannote_segment = self.pad(resampled_waveform, pyannote_segment)

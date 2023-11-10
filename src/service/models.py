@@ -33,7 +33,11 @@ class Annotator(Base):  # type: ignore
     ispreauthorized = Column(Boolean, default=True)
     isadmin = Column(Boolean, default=False)
     # defines
-    datasets = relationship("Dataset", secondary=annotator_dataset, backref=backref("assigned_annotators", passive_deletes=True))
+    datasets = relationship(
+        "Dataset",
+        secondary=annotator_dataset,
+        backref=backref("assigned_annotators", passive_deletes=True),
+    )
 
     # add unique constraint to username
     __table_args__ = (
@@ -74,6 +78,7 @@ class Sample(Base):  # type: ignore
     asr_text = Column(String(250), unique=False, nullable=True)
     duration = Column(Float, unique=False, nullable=False)
     trimmed_audio_duration = Column(Float, unique=False, nullable=True)
+    custom_trimmed_audio_duration = Column(Float, unique=False, nullable=True)
     sentence_type = Column(String(50), unique=False, nullable=False)
     sentence_length = Column(Integer, unique=False, nullable=False)
     sampling_rate = Column(Integer, unique=False, nullable=False)
@@ -218,7 +223,11 @@ class Dataset(Base):  # type: ignore
     created_at = Column(DateTime, default=func.now())
 
     samples = relationship("Sample", cascade="all, delete", backref="dataset")
-    annotators = relationship("Annotator", secondary=annotator_dataset, backref=backref("assigned_datasets", passive_deletes=True))
+    annotators = relationship(
+        "Annotator",
+        secondary=annotator_dataset,
+        backref=backref("assigned_datasets", passive_deletes=True),
+    )
 
     __table_args__ = (UniqueConstraint("name", name="_name_uc"),)
 
@@ -226,4 +235,10 @@ class Dataset(Base):  # type: ignore
         return f"{self.to_dict()}"
 
     def to_dict(self):
-        return {"id": self.id, "name": self.name, "description": self.description, "language": self.language, "created_at": self.created_at}
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "language": self.language,
+            "created_at": self.created_at,
+        }

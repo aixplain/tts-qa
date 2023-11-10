@@ -6,7 +6,6 @@ sys.path.append("../")
 
 import psycopg2
 from dotenv import load_dotenv
-from pydub import AudioSegment
 from tqdm import tqdm
 
 # Assuming custom_vad_function is a function you have that takes a filename and returns new start and end trim times
@@ -46,8 +45,10 @@ from src.utils.db_utils import convert_to_88k, convert_to_mono, convert_to_s16le
 
 # Process each dataset
 for dataset_id, dataset_name in datasets:
-    if dataset_name != "German(Dorothee)":
+    if dataset_name in ["English (Alyssa)"]:
         continue
+    if dataset_name == "German(Dorothee)":
+        my_custom_vad.set_energy_threshold(3_000_000)
     print(f"Processing dataset: {dataset_name}")
 
     # Retrieve all samples that are selected for delivery from the current dataset
@@ -55,8 +56,7 @@ for dataset_id, dataset_name in datasets:
         """
         SELECT id, filename, local_path, local_trimmed_path
         FROM sample
-        WHERE is_selected_for_delivery = TRUE AND
-                dataset_id = %s;
+        WHERE dataset_id = %s;
     """,
         (dataset_id,),
     )
@@ -66,6 +66,10 @@ for dataset_id, dataset_name in datasets:
     for id, filename, local_path, local_trimmed_path in tqdm(samples):
         # Define the new trimmed path  from '/data/tts-qa/tts-data/French(Dorsaf) Deliverable 7/trimmed/FR00054280.wav'
         trimmed2_path = local_trimmed_path.replace("trimmed", "trimmed2")
+
+        if os.path.exists(trimmed2_path):
+            continue
+
         # Run custom VAD to get new trim times
         response = my_custom_vad.process_file(local_path)
 
@@ -75,34 +79,34 @@ for dataset_id, dataset_name in datasets:
         trim_start = round(trim_start, 2)
         trim_end = round(trim_end, 2)
 
-        # Load the audio file
-        audio = AudioSegment.from_wav(local_path)
-
         # Trim the audio
         trim_audio(local_path, trim_start, trim_end, trimmed2_path)
-        meta = evaluate_audio(trimmed2_path)
+        duration = float(trim_end - trim_start)
 
-        if meta["is_88khz"] == False:
-            convert_to_88k(trimmed2_path, trimmed2_path)
+        if dataset_name == "German(Dorothee)":
+            meta = evaluate_audio(trimmed2_path)
 
-        if meta["is_mono"] == False:
-            convert_to_mono(trimmed2_path, trimmed2_path)
+            if meta["is_88khz"] == False:
+                convert_to_88k(trimmed2_path, trimmed2_path)
 
-        if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
-            normalize_audio(trimmed2_path, trimmed2_path)
+            if meta["is_mono"] == False:
+                convert_to_mono(trimmed2_path, trimmed2_path)
 
-        if meta["isPCM"] == False:
-            convert_to_s16le(trimmed2_path, trimmed2_path)
+            if meta["peak_volume_db"] < -6 or meta["peak_volume_db"] > -3:
+                normalize_audio(trimmed2_path, trimmed2_path)
+
+            if meta["isPCM"] == False:
+                convert_to_s16le(trimmed2_path, trimmed2_path)
 
         try:
             # Update the database with the new trim times (if necessary)
             cur.execute(
                 """
                 UPDATE sample
-                SET trim_custom_start = %s, trim_custom_end = %s, local_custom_trimmed_path = %s
+                SET trim_custom_start = %s, trim_custom_end = %s, local_custom_trimmed_path = %s, custom_trimmed_audio_duration = %s
                 WHERE id = %s;
             """,
-                (trim_start, trim_end, trimmed2_path, id),
+                (trim_start, trim_end, trimmed2_path, duration, id),
             )
             conn.commit()
         except Exception as e:
