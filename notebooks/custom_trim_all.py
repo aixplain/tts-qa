@@ -45,10 +45,15 @@ from src.utils.db_utils import convert_to_88k, convert_to_mono, convert_to_s16le
 
 # Process each dataset
 for dataset_id, dataset_name in datasets:
+    if dataset_name == "English(Melynda)":
+        my_custom_vad.set_padding(0.050)
+    else:
+        continue
     if dataset_name in ["English (Alyssa)"]:
         continue
     if dataset_name == "German(Dorothee)":
         my_custom_vad.set_energy_threshold(3_000_000)
+
     print(f"Processing dataset: {dataset_name}")
 
     # Retrieve all samples that are selected for delivery from the current dataset
@@ -67,8 +72,8 @@ for dataset_id, dataset_name in datasets:
         # Define the new trimmed path  from '/data/tts-qa/tts-data/French(Dorsaf) Deliverable 7/trimmed/FR00054280.wav'
         trimmed2_path = local_trimmed_path.replace("trimmed", "trimmed2")
 
-        if os.path.exists(trimmed2_path):
-            continue
+        # if os.path.exists(trimmed2_path):
+        #     continue
 
         # Run custom VAD to get new trim times
         response = my_custom_vad.process_file(local_path)
