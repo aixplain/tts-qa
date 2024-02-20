@@ -46,4 +46,4 @@ Instructions:
    e. **Submitting the Annotation:**
       - Once you have selected the best transcription or discarded the audio, click on the "Submit" button to save your annotation.
 
-**Note:** Please ensure that you follow these guidelines while using the aiXplain QA Tool for checking recordings used in TTS model training.
+**Note:** Please ensure that you follow these guidelines while using the QA Tool for checking recordings used in TTS model training.

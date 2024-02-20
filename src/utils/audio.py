@@ -31,27 +31,22 @@ vad_pipeline.instantiate(HYPER_PARAMETERS)
 
 api_keys_azure = {
     "en": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc378",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc378"),
     },
     "es": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc375",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc375"),
     },
     "fr": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc389",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc389"),
     },
     "it": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc353",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc353"),
     },
     "de": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "62fab6ecb39cca09ca5bc334",
         "model": ModelFactory.create_asset_from_id("62fab6ecb39cca09ca5bc334"),
     },
@@ -60,27 +55,22 @@ api_keys_azure = {
 
 api_keys_aws = {
     "en": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "60ddef908d38c51c5885dd1e",
         "model": ModelFactory.create_asset_from_id("60ddef908d38c51c5885dd1e"),
     },
     "es": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "60ddefd68d38c51c588608c6",
         "model": ModelFactory.create_asset_from_id("60ddefd68d38c51c588608c6"),
     },
     "fr": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "60ddefde8d38c51c58860d8d",
         "model": ModelFactory.create_asset_from_id("60ddefde8d38c51c58860d8d"),
     },
     "it": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "60ddefa38d38c51c5885e979",
         "model": ModelFactory.create_asset_from_id("60ddefa38d38c51c5885e979"),
     },
     "de": {
-        "api_key": "2b3632015768088470d98273667a627e0e5a7d2d659ec3cf4b06bfa368eaa1a8",
         "id": "60ddefc48d38c51c5885fd69",
         "model": ModelFactory.create_asset_from_id("60ddefc48d38c51c5885fd69"),
     },
