@@ -1,0 +1,82 @@
+# # exclude if you don't want to use pre-commit
+# exclude: <folder to exclude>
+repos:
+# simple, useful checks
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.0.1
+  hooks:
+  - id: check-added-large-files
+    args: [--maxkb=1500]
+  - id: check-json
+  - id: check-yaml
+    args: ['--unsafe'] # this will allow us to use tags like !ref and !new
+  - id: check-merge-conflict
+  - id: check-executables-have-shebangs
+  - id: check-shebang-scripts-are-executable
+  - id: debug-statements
+  - id: detect-private-key
+  - id: end-of-file-fixer
+  - id: fix-byte-order-marker
+  - id: pretty-format-json
+    args: [--autofix, --no-sort-keys]
+  - id: trailing-whitespace
+# sort imports
+- repo: https://github.com/pycqa/isort
+  rev: 5.10.1
+  hooks:
+  - id: isort
+    name: isort
+    args:
+    # passing settings here did not work, so we pass them in a pyproject.toml file
+    - --settings-path=pyproject.toml
+# format code
+- repo: https://github.com/psf/black
+  rev: 22.3.0
+  hooks:
+  - id: black
+    args:
+    - --line-length=160
+# run type checker
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v0.910
+  hooks:
+  - id: mypy
+    exclude: backend/database/ # exclude this folder because it is generated
+    exclude: src/data/public/
+    additional_dependencies:
+    - pydantic
+    - types-all
+    args:
+    - --ignore-missing-imports
+    - --no-strict-optional
+    - --no-warn-no-return
+# run linter
+- repo: https://github.com/PyCQA/flake8
+  rev: 3.9.2
+  hooks:
+  - id: flake8
+    additional_dependencies:
+    - pep8-naming
+    - flake8-bugbear
+    - flake8-comprehensions
+    - flake8-cognitive-complexity
+    - flake8-expression-complexity
+    - pep8-naming
+    args:
+    - --select=F401,N801,N802,N804,N805,N807
+    - --max-cognitive-complexity=2
+# check for old-style python patterns (e.g. class Foo(object):) and correct them
+- repo: https://github.com/asottile/pyupgrade
+  rev: v3.1.0
+  hooks:
+  - id: pyupgrade
+    args: [--py38-plus]
+# clear output of notebooks
+- repo: local
+  hooks:
+  - id: jupyter-nb-clear-output
+    name: jupyter-nb-clear-output
+    files: \.ipynb$
+    stages: [commit]
+    language: system
+    entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
