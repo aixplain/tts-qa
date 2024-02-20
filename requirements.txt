@@ -18,7 +18,7 @@ python-dotenv==1.0.0
 SoundFile==0.10.3.post1
 SQLAlchemy==1.4.47
 starlette==0.26.1
-streamlit==1.19.0
+streamlit==1.30.0
 streamlit_authenticator==0.2.1
 tqdm==4.64.1
 wandb==0.15.2
