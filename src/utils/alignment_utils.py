@@ -18,7 +18,7 @@ from pydub import AudioSegment
 from tqdm import tqdm
 
 from src.logger import root_logger
-from src.utils.audio import trim_audio
+from src.utils.audio import CustomVAD, trim_audio
 from src.utils.whisper_model import WhisperTimestampedASR
 
 
@@ -57,6 +57,8 @@ lang_map = {
     "it": "italian",
 }
 
+my_custom_vad = CustomVAD(pyannote_model_path="pyannote/segmentation", silero_model_path="snakers4/silero-vad")
+
 whisper_model = WhisperTimestampedASR(model_size="medium", language="english", device="cuda")
 
 
@@ -64,7 +66,13 @@ padding = 0.25
 
 
 def align_wavs_whisper(
-    job: Task, wavs_path: str, csv_path: str, language: str, start_id_regex: str, end_id_regex: str, assigned_only: bool = True
+    job: Task,
+    wavs_path: str,
+    csv_path: str,
+    language: str,
+    start_id_regex: str,
+    end_id_regex: str,
+    assigned_only: bool = True,
 ) -> Tuple[str, str]:
     app_logger.info(f"Aligning wavs in {wavs_path} with csv file {csv_path} using Whisper for {language}")
     whisper_model.load(language=lang_map[language])
@@ -169,7 +177,17 @@ def align_wavs_whisper(
             # get the best match for each segment
             best_matches = np.argmin(distances_matrix, axis=1)
             # # make a dataframe
-            columns = ["status", "filename", "sentenceNumber", "sentence", "asr", "start", "end", "ed_dist", "len_dif"]
+            columns = [
+                "status",
+                "filename",
+                "sentenceNumber",
+                "sentence",
+                "asr",
+                "start",
+                "end",
+                "ed_dist",
+                "len_dif",
+            ]
             df = pd.DataFrame(columns=columns)
             best_matched_sentences = [sentences_list[k] for k in best_matches]
 
@@ -225,7 +243,16 @@ def align_wavs_whisper(
             # if not assigned, create a wav file with the start and end times of the segment
             app_logger.info(f"Trimming audio for {filename}, it will be saved in {output_wavs_dir}")
             # columns should be following: local_path,file_name,unique_identifier,text,sentence_length,sentence_type
-            columns = ["status", "local_path", "file_name", "unique_identifier", "text", "asr", "sentence_length", "sentence_type"]
+            columns = [
+                "status",
+                "local_path",
+                "file_name",
+                "unique_identifier",
+                "text",
+                "asr",
+                "sentence_length",
+                "sentence_type",
+            ]
             df_final = pd.DataFrame(columns=columns)
             for index, row in tqdm(df.iterrows(), total=len(df)):
                 start = row["start"]
@@ -282,7 +309,13 @@ def align_wavs_whisper(
 
 
 def align_wavs_vad(
-    job: Task, wavs_path: str, csv_path: str, language: str, start_id_regex: str, end_id_regex: str, assigned_only: bool = True
+    job: Task,
+    wavs_path: str,
+    csv_path: str,
+    language: str,
+    start_id_regex: str,
+    end_id_regex: str,
+    assigned_only: bool = True,
 ) -> Tuple[str, str]:
     app_logger.info(f"Aligning wavs in {wavs_path} with csv file {csv_path} using VAD for {language}")
     whisper_model.load(language=lang_map[language])
@@ -368,6 +401,23 @@ def align_wavs_vad(
                     # save audio to a tmp file
                     temp_file = os.path.join(temp_dir, "tmp.wav")
                     outputAudio.export(temp_file, format="wav")
+
+                    response = my_custom_vad.process_file(temp_file)
+
+                    trim_start, trim_end = tuple(response["custom_segment"])
+
+                    # round 2
+                    trim_start = round(trim_start, 2)
+                    trim_end = round(trim_end, 2)
+
+                    seg["SegmentStart"] = start + trim_start
+                    seg["SegmentEnd"] = start + trim_end
+                    outputAudio = AudioSegment.empty()
+                    outputAudio += data[seg["SegmentStart"] * 1000 : seg["SegmentEnd"] * 1000]
+                    # save audio to a tmp file
+                    temp_file = os.path.join(temp_dir, "tmp.wav")
+                    outputAudio.export(temp_file, format="wav")
+
                     # run ASR
                     try:
                         result = whisper_model.predict({"instances": [{"url": temp_file}]})
@@ -397,7 +447,17 @@ def align_wavs_vad(
             # get the best match for each segment
             best_matches = np.argmin(distances_matrix, axis=1)
             # # make a dataframe
-            columns = ["status", "filename", "sentenceNumber", "sentence", "asr", "start", "end", "ed_dist", "len_dif"]
+            columns = [
+                "status",
+                "filename",
+                "sentenceNumber",
+                "sentence",
+                "asr",
+                "start",
+                "end",
+                "ed_dist",
+                "len_dif",
+            ]
             df = pd.DataFrame(columns=columns)
             best_matched_sentences = [sentences_list[k] for k in best_matches]
 
@@ -453,7 +513,16 @@ def align_wavs_vad(
             # if not assigned, create a wav file with the start and end times of the segment
             app_logger.info(f"Trimming audio for {filename}, it will be saved in {output_wavs_dir}")
             # columns should be following: local_path,file_name,unique_identifier,text,sentence_length,sentence_type
-            columns = ["status", "local_path", "file_name", "unique_identifier", "text", "asr", "sentence_length", "sentence_type"]
+            columns = [
+                "status",
+                "local_path",
+                "file_name",
+                "unique_identifier",
+                "text",
+                "asr",
+                "sentence_length",
+                "sentence_type",
+            ]
             df_final = pd.DataFrame(columns=columns)
             for index, row in tqdm(df.iterrows(), total=len(df)):
                 start = row["start"]

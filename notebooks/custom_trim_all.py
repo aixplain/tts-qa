@@ -46,7 +46,7 @@ from src.utils.db_utils import convert_to_88k, convert_to_mono, convert_to_s16le
 # Process each dataset
 for dataset_id, dataset_name in datasets:
     if dataset_name == "English(Melynda)":
-        my_custom_vad.set_padding(0.050)
+        my_custom_vad.set_padding(0.075)
     else:
         continue
     if dataset_name in ["English (Alyssa)"]:
