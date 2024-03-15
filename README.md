@@ -9,16 +9,16 @@
 
 #### Details:
 Prior to running the code, you will need to set up the following services to set up the repo:
-- **[aiXplain](https://platform.aixplain.com/)**: For transcribing audio, ASR models are accessed from the aiXplain platform. This repo makes use of the aixplain platform and its models as an essential element. aiXplain provides easy to use no-code AI/ ML solutions to integrate into applications such as this. They can be easily integrated into applications with a single API call. 
+- **[aiXplain](https://platform.aixplain.com/)**: For transcribing audio, ASR models are accessed from the aiXplain platform. This repo makes use of the aixplain platform and its models as an essential element. aiXplain provides easy to use no-code AI/ ML solutions to integrate into applications such as this. They can be easily integrated into applications with a single API call.
 
-    To use the aiXplain tools, you firstly need to create an account on the aiXplain platform. Then, you can choose from the plethora of models to use directly or create pipelines that use those models in a cascade. Trying or deploying those models requires credits, which may be easily purchased from the platform. 
-    
+    To use the aiXplain tools, you firstly need to create an account on the aiXplain platform. Then, you can choose from the plethora of models to use directly or create pipelines that use those models in a cascade. Trying or deploying those models requires credits, which may be easily purchased from the platform.
+
     After setting up, you need to generate a private TEAM_API_KEY from the integrations settings. Please store that safely as it will be used by the aiXplain SDK to securely access your account and models/ pipelines.
-    
+
     Following are some short youtube videos that explain the aiXplain platform and how to use it:
-    * **[aiXplain Teaser](https://www.youtube.com/watch?v=lDIe0kA-DJ8)**: Overview 
-    * **[aiXplain Tools](https://www.youtube.com/watch?v=A7MuD8W_Qkw)**: Tools overview such as models, piplines, benchmark and finetune. 
-    * **[aiXplain Discover](https://www.youtube.com/watch?v=H6_gmsCE4vM)**: Find and try over 38,000 models hosted on the platform 
+    * **[aiXplain Teaser](https://www.youtube.com/watch?v=lDIe0kA-DJ8)**: Overview
+    * **[aiXplain Tools](https://www.youtube.com/watch?v=A7MuD8W_Qkw)**: Tools overview such as models, piplines, benchmark and finetune.
+    * **[aiXplain Discover](https://www.youtube.com/watch?v=H6_gmsCE4vM)**: Find and try over 38,000 models hosted on the platform
     * **[aiXplain Credits](https://www.youtube.com/watch?v=X5EYqXDKb3I)**: How to purchase and use credits
 
 - AWS S3 bucket: This is used to temporarily store data for being processed by the pipeline.
@@ -49,7 +49,7 @@ celery -A src.service.tasks worker --loglevel=info --pool=threads
 ## Start Backend
 The following will start the backend service that handes the data processing.
 ```
-uvicorn src.service.api:app --port 8089 --reload
+uvicorn src.service.api:app --port 8088 --reload
 ```
 
 ## Start WebApp Frontend
@@ -65,7 +65,7 @@ python -m streamlit run --server.port 8501 ./src/web_app/annotator/🏠_Intro_an
 You may use the following command to run the admin app while in the project root directory.
 
 ```
-python -m streamlit run --server.port 8502  --server.maxUploadSize 8192 ./tts-qa/src/web_app/admin/🏠_Intro_admin.py
+python -m streamlit run --server.port 8502  --server.maxUploadSize 8192 ./src/web_app/admin/🏠_Intro_admin.py
 ```
 You may choose open ports of your choice.
 

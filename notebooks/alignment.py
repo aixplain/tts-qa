@@ -62,6 +62,7 @@ lang_map = {
     "es": "spanish",
     "de": "german",
     "it": "italian",
+    "am": "amharic",
 }
 
 for batch in batches:
@@ -176,7 +177,17 @@ for batch in batches:
         best_matches = np.argmin(distances_matrix, axis=1)
 
         # # make a dataframe
-        columns = ["status", "filename", "sentenceNumber", "sentence", "asr", "start", "end", "ed_dist", "len_dif"]
+        columns = [
+            "status",
+            "filename",
+            "sentenceNumber",
+            "sentence",
+            "asr",
+            "start",
+            "end",
+            "ed_dist",
+            "len_dif",
+        ]
         df = pd.DataFrame(columns=columns)
         best_matched_sentences = [sentences_list[k] for k in best_matches]
 
@@ -245,8 +256,16 @@ for batch in batches:
             sentence = row["sentence"]
             status = row["status"]
             if status == "assigned":
-                wav_path = os.path.join(wav_folder, "assigned", f"{language.upper()}" + format_int(row["sentenceNumber"]) + ".wav")
+                wav_path = os.path.join(
+                    wav_folder,
+                    "assigned",
+                    f"{language.upper()}" + format_int(row["sentenceNumber"]) + ".wav",
+                )
             else:
-                wav_path = os.path.join(wav_folder, "not_assigned", f"{language.upper()}" + format_int(row["sentenceNumber"]) + ".wav")
+                wav_path = os.path.join(
+                    wav_folder,
+                    "not_assigned",
+                    f"{language.upper()}" + format_int(row["sentenceNumber"]) + ".wav",
+                )
 
             outpath, start, end = trim_audio(filename, start, end, wav_path)

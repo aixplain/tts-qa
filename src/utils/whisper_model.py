@@ -22,6 +22,7 @@ lang_map = {
     "es": "spanish",
     "de": "german",
     "it": "italian",
+    "am": "amharic",
 }
 
 inverse_lang_map = {v: k for k, v in lang_map.items()}
@@ -33,7 +34,12 @@ class WhisperTimestampedASR:
         self.model = None
         self.ready = False
         self.device = device
-        self.transcribe_options = dict(detect_disfluencies=True, vad=True, verbose=None, language=inverse_lang_map[language])
+        self.transcribe_options = dict(
+            detect_disfluencies=True,
+            vad=True,
+            verbose=None,
+            language=inverse_lang_map[language],
+        )
         self.model_size = model_size
 
     def load(self, language: str = None):
@@ -89,7 +95,11 @@ class WhisperTimestampedASR:
                     transcriptions.append(text)
                     segments.append(segments)
 
-            return {"predictions": transcriptions, "segments": segments, "disfluencies": disfluencies}
+            return {
+                "predictions": transcriptions,
+                "segments": segments,
+                "disfluencies": disfluencies,
+            }
         except ValueError as e:
             print(traceback.format_exc())
             raise ValueError(f"Failed to process request: {e}")

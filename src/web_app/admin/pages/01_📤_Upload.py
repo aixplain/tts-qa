@@ -47,6 +47,7 @@ lang_map = {
     "French": "fr",
     "Spanish": "es",
     "Italian": "it",
+    "Amharic": "am",
 }
 
 app_logger = root_logger.getChild("web_app::create_dataset")
@@ -88,12 +89,18 @@ def app():
     datasets = get_datasets()
 
     # either select a dataset or create a new one
-    selected_dataset_name = st.selectbox("Dataset", [dataset["name"] for dataset in datasets] + ["Create New TTS Dataset"])
+    selected_dataset_name = st.selectbox(
+        "Dataset",
+        [dataset["name"] for dataset in datasets] + ["Create New TTS Dataset"],
+    )
 
     if selected_dataset_name == "Create New TTS Dataset":
         dataset_name = st.text_input("Dataset Name")
         dataset_description = st.text_input("Dataset Description")
-        dataset_language = st.selectbox("Language of Dataset", ["English", "German", "French", "Spanish", "Italian"])
+        dataset_language = st.selectbox(
+            "Language of Dataset",
+            ["English", "German", "French", "Spanish", "Italian", "Amharic"],
+        )
 
         if st.button("Create Dataset"):
             # create new dataset object
@@ -124,12 +131,19 @@ def app():
             elif selected_dataset_option == "Update Dataset":
                 dataset_name = st.text_input("Dataset Name")
                 dataset_description = st.text_input("Dataset Description")
-                dataset_language = st.selectbox("Language of Dataset", ["English", "German", "French", "Spanish", "Italian"])
+                dataset_language = st.selectbox(
+                    "Language of Dataset",
+                    ["English", "German", "French", "Spanish", "Italian"],
+                )
 
                 if st.button("Update Dataset"):
                     r = requests.put(
                         BACKEND_URL + "/datasets/{}".format(st.session_state["dataset"]["id"]),
-                        json={"dataset_name": dataset_name, "description": dataset_description, "language": lang_map[dataset_language]},
+                        json={
+                            "dataset_name": dataset_name,
+                            "description": dataset_description,
+                            "language": lang_map[dataset_language],
+                        },
                     )
                     st.write(r.json())
                     st.session_state["dataset"] = r.json()
@@ -184,7 +198,16 @@ def app():
 
                         st.session_state["failed_files"] = []
                         # read csv file
-                        csv = pd.read_csv(uploaded_file, delimiter=",", usecols=["unique_identifier", "text", "sentence_length", "sentence_type"])
+                        csv = pd.read_csv(
+                            uploaded_file,
+                            delimiter=",",
+                            usecols=[
+                                "unique_identifier",
+                                "text",
+                                "sentence_length",
+                                "sentence_type",
+                            ],
+                        )
                         if csv[csv.isnull().any(axis=1)].shape[0] > 0:
                             st.error("CSV file contains NaN values")
                         else:
@@ -215,7 +238,10 @@ def app():
                                 # move the wav file to the temp dir
                                 shutil.move(wav_file, tempdir_aggregated)
                             # get all wav files in temp directory
-                            wav_files = glob(os.path.join(tempdir_aggregated, "**", "*.wav"), recursive=True)
+                            wav_files = glob(
+                                os.path.join(tempdir_aggregated, "**", "*.wav"),
+                                recursive=True,
+                            )
 
                             # remove old temp dir
                             shutil.rmtree(temp_dir)
@@ -251,10 +277,11 @@ def app():
                                 params = {
                                     "wavs_path": temp_dir,
                                     "csv_path": csv_dir,
-                                    "deliverable": None if deliverable == "" else deliverable,
+                                    "deliverable": (None if deliverable == "" else deliverable),
                                 }
                                 response = requests.get(
-                                    BACKEND_URL + "/datasets/{}/upload_segmented_async".format(st.session_state["dataset"]["id"]), params=params
+                                    BACKEND_URL + "/datasets/{}/upload_segmented_async".format(st.session_state["dataset"]["id"]),
+                                    params=params,
                                 )
                                 if response.status_code == 200:
                                     st.session_state["job_id"] = response.json()["job_id"]
@@ -270,12 +297,13 @@ def app():
                                     params = {
                                         "wavs_path": temp_dir,
                                         "csv_path": csv_dir,
-                                        "deliverable": None if deliverable == "" else deliverable,
+                                        "deliverable": (None if deliverable == "" else deliverable),
                                         "start_id_regex": start_id_regex,
                                         "end_id_regex": end_id_regex,
                                     }
                                     response = requests.get(
-                                        BACKEND_URL + "/datasets/{}/upload_unsegmented_async".format(st.session_state["dataset"]["id"]), params=params
+                                        BACKEND_URL + "/datasets/{}/upload_unsegmented_async".format(st.session_state["dataset"]["id"]),
+                                        params=params,
                                     )
                                     if response.status_code == 200:
                                         st.session_state["job_id"] = response.json()["job_id"]

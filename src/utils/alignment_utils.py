@@ -12,15 +12,26 @@ import editdistance
 import numpy as np
 import pandas as pd
 from celery import Task
+from dotenv import load_dotenv
 from pyannote.audio import Model
 from pyannote.audio.pipelines import VoiceActivityDetection
 from pydub import AudioSegment
 from tqdm import tqdm
 
 from src.logger import root_logger
+from src.paths import paths
 from src.utils.audio import CustomVAD, trim_audio
 from src.utils.whisper_model import WhisperTimestampedASR
 
+
+load_dotenv(os.path.join(paths.PROJECT_ROOT_DIR, "vars.env"))
+load_dotenv(os.path.join(paths.PROJECT_ROOT_DIR, "secrets.env"), override=True)
+
+
+from aixplain.factories import ModelFactory
+
+
+model_amharic = ModelFactory.get("616d8b2bbcbd046748430402")
 
 app_logger = root_logger.getChild("alignment_utils")
 
@@ -31,6 +42,26 @@ def edit_distance(s1, s2):
 
 def format_int(i):
     return str(i).zfill(8)
+
+
+import re
+import string
+
+
+def remove_punctuation(sentence):
+    # Define Amharic punctuation marks
+    amharic_punctuation = "፡።፣፤፥፦፧፨፠፡።፣፤፥፦፧፨፠"
+
+    # Combine Amharic and Latin punctuation marks
+    all_punctuation = amharic_punctuation + string.punctuation
+
+    # Define a regex pattern to match all punctuation marks
+    punctuation_pattern = "[" + re.escape(all_punctuation) + "]"
+
+    # Remove punctuation marks using regex
+    cleaned_sentence = re.sub(punctuation_pattern, "", sentence)
+
+    return cleaned_sentence
 
 
 modelPyannote = Model.from_pretrained("pyannote/segmentation", use_auth_token="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")
@@ -55,12 +86,15 @@ lang_map = {
     "es": "spanish",
     "de": "german",
     "it": "italian",
+    "am": "amharic",
 }
 
 my_custom_vad = CustomVAD(pyannote_model_path="pyannote/segmentation", silero_model_path="snakers4/silero-vad")
 
 whisper_model = WhisperTimestampedASR(model_size="medium", language="english", device="cuda")
 
+
+# amharic langauge model 616d8b2bbcbd046748430402
 
 padding = 0.25
 
@@ -315,10 +349,12 @@ def align_wavs_vad(
     language: str,
     start_id_regex: str,
     end_id_regex: str,
-    assigned_only: bool = True,
+    assigned_only: bool = False,
 ) -> Tuple[str, str]:
     app_logger.info(f"Aligning wavs in {wavs_path} with csv file {csv_path} using VAD for {language}")
-    whisper_model.load(language=lang_map[language])
+
+    if lang_map[language] != "am":
+        whisper_model.load(language=lang_map[language])
     app_logger.info(f"wav_path: {wavs_path}")
 
     filenames = glob(os.path.join(wavs_path, "*.wav"))
@@ -366,8 +402,8 @@ def align_wavs_vad(
             df_sentences["id_int"] = id_int
             df_sentences.set_index("id_int", inplace=True)
             # include only ids in between start_loc and end_loc
+            df_sentences.sort_values(by="id_int", inplace=True)
             df_sentences = df_sentences.loc[start_loc:end_loc]
-
             app_logger.info(f"There are {len(df_sentences)} sentences in this range")
             for index, row in df_sentences.iterrows():
                 sentenceNum = int(index)
@@ -416,12 +452,17 @@ def align_wavs_vad(
                     outputAudio += data[seg["SegmentStart"] * 1000 : seg["SegmentEnd"] * 1000]
                     # save audio to a tmp file
                     temp_file = os.path.join(temp_dir, "tmp.wav")
-                    outputAudio.export(temp_file, format="wav")
+                    # should be 16 bit pcm
+                    outputAudio.export(temp_file, format="wav", parameters=["-ac", "1"], bitrate="16k")
 
                     # run ASR
                     try:
-                        result = whisper_model.predict({"instances": [{"url": temp_file}]})
-                        asr = result["predictions"][0]
+                        if lang_map[language] == "amharic":
+                            result = model_amharic.run(temp_file)
+                            asr = result["data"]
+                        else:
+                            result = whisper_model.predict({"instances": [{"url": temp_file}]})
+                            asr = result["predictions"][0]
                         seg["asr"] = asr
                     except:
                         app_logger.error(f"Failed to run ASR for {filename} - traceback: {traceback.format_exc()}")
@@ -440,7 +481,11 @@ def align_wavs_vad(
             for ik in range(len(segments_list)):
                 for jk, sentence in enumerate(sentences_list):
                     try:
-                        distances_matrix[ik, jk] = edit_distance(segments_list[ik]["asr"], sentence) / min(len(segments_list[ik]["asr"]), len(sentence))
+                        sent_tmp = remove_punctuation(sentence)
+                        # remove spaces
+                        sent_tmp = sent_tmp.replace(" ", "")
+                        segment_asr = segments_list[ik]["asr"].replace(" ", "")
+                        distances_matrix[ik, jk] = edit_distance(segment_asr, sent_tmp) / min(len(segment_asr), len(sent_tmp))
                     except:
                         distances_matrix[ik, jk] = np.inf
 
@@ -473,7 +518,7 @@ def align_wavs_vad(
                 start = segments_list[ik]["SegmentStart"]
                 end = segments_list[ik]["SegmentEnd"]
                 sentenceNumber = inverseSentences[sentence]
-                if ed_dist < 0.25 and len_dif < 0.15:
+                if ed_dist < 0.5 and len_dif < 0.15:
                     status = "assigned"
                 else:
                     status = "not_assigned"
@@ -493,6 +538,9 @@ def align_wavs_vad(
             # if there is inf  drop it
             df = df.replace([np.inf, -np.inf], np.nan)
             df.dropna(inplace=True)
+
+            df.to_csv("/home/ubuntu/repos/tts-qa/test.csv", index=False)
+            app_logger.info(f"Saved the csv file in /home/ubuntu/repos/tts-qa/test.csv")
 
             app_logger.info(f"Assigned {len(df[df.status=='assigned'])} segments")
             app_logger.info(f"Not assigned {len(df[df.status=='not_assigned'])} segments")

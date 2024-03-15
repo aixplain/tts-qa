@@ -6,10 +6,12 @@ logging.basicConfig(level=logging.DEBUG)
 import os
 
 import librosa
+from dotenv import find_dotenv, load_dotenv
 from tqdm import tqdm
 
 from src.paths import paths
-from dotenv import find_dotenv, load_dotenv
+
+
 load_dotenv(find_dotenv(paths.PROJECT_ROOT_DIR / "vars.env"), override=True)
 
 import sys
@@ -56,7 +58,10 @@ session = Session()
 
 client_config = botocore.config.Config(max_pool_connections=50)
 s3 = boto3.client(
-    "s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"), config=client_config
+    "s3",
+    aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+    config=client_config,
 )
 bucket_name = os.environ.get("S3_BUCKET_NAME")
 dataset_dir = os.environ.get("S3_DATASET_DIR")
@@ -74,6 +79,7 @@ lang_map = {
     "es": "spanish",
     "de": "german",
     "it": "italian",
+    "am": "amharic",
 }
 
 import string
@@ -108,7 +114,10 @@ def asr_and_trim_(session_, sample, language, use="azure"):
     sample.trimmed_audio_duration = round(float(end - start), 2)
     sample.longest_pause = round(float(response["longest_pause"]), 2)
     sample.asr_text = str(response["asr_text"])
-    sample.wer = round(float(utils.calculate_wer(sample.original_text.lower(), sample.asr_text.lower())), 2)
+    sample.wer = round(
+        float(utils.calculate_wer(sample.original_text.lower(), sample.asr_text.lower())),
+        2,
+    )
 
     # update sample
     object_key = out_path.split(f"{str(paths.LOCAL_BUCKET_DIR)}/")[1]
@@ -121,7 +130,7 @@ def asr_and_trim_(session_, sample, language, use="azure"):
     session_.commit()
 
 
-def trim_only_(session_, sample, language):
+def trim_only_(sample, language):
     response = trim_only(sample.local_path)
 
     start = float(response["trim_start"]) - offset
@@ -132,16 +141,19 @@ def trim_only_(session_, sample, language):
     sample.trim_end = round(float(end), 2)
     sample.trimmed_audio_duration = round(float(end - start), 2)
     sample.longest_pause = round(float(response["longest_pause"]), 2)
-    sample.wer = round(float(utils.calculate_wer(sample.original_text.lower(), sample.asr_text.lower())), 2)
+    sample.wer = round(
+        float(utils.calculate_wer(sample.original_text.lower(), sample.asr_text.lower())),
+        2,
+    )
     # update sample
     object_key = out_path.split(f"{str(paths.LOCAL_BUCKET_DIR)}/")[1]
     s3TrimmedPath = f"s3://{bucket_name}/{object_key}"
 
     sample.local_trimmed_path = out_path
     sample.s3TrimmedPath = str(s3TrimmedPath)
-    session_.add(sample)
+
     s3.upload_file(out_path, bucket_name, object_key)
-    session_.commit()
+    return sample
 
 
 def trim_and_asr_(sample, language):
@@ -214,7 +226,7 @@ def process_datasets():
         #     whisper_model.load(language=lang_map[language])
         while samples:
             with ThreadPoolExecutor(max_workers=32) as executor:
-                futures = [executor.submit(trim_and_asr_, sample, language) for sample in samples]
+                futures = [executor.submit(trim_only_, sample, language) for sample in samples]
 
                 # Use tqdm to display the progress of processing finished samples
                 for future in tqdm(as_completed(futures), total=len(futures), desc="Processing samples"):

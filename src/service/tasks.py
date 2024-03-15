@@ -17,6 +17,7 @@ load_dotenv(os.path.join(BASE_DIR, "vars.env"))
 app_logger = root_logger.getChild("celery")
 s3_bucket_name = os.environ.get("S3_BUCKET_NAME")
 s3_dataset_dir = os.environ.get("S3_DATASET_DIR")
+REDIS_PORT = os.environ.get("REDIS_PORT")
 
 
 # get engine from url
@@ -36,8 +37,8 @@ session = SessionObject()
 app = Celery("TTS-QA")
 
 # Configure the broker and result backend
-app.conf.broker_url = "redis://localhost:6379/0"
-app.conf.result_backend = "redis://localhost:6379/0"
+app.conf.broker_url = f"redis://localhost:{REDIS_PORT}/0"
+app.conf.result_backend = f"redis://localhost:{REDIS_PORT}/0"
 
 
 @app.task(bind=True)
@@ -49,7 +50,14 @@ def segmented_onboarding_job(self: Task, dataset_id: int, csv_path: str, deliver
 
 @app.task(bind=True)
 def unsegmented_onboarding_job(
-    self: Task, dataset_id: int, language: str, wavs_path: str, csv_path: str, start_id_regex: str, end_id_regex: str, deliverable: str = None
+    self: Task,
+    dataset_id: int,
+    language: str,
+    wavs_path: str,
+    csv_path: str,
+    start_id_regex: str,
+    end_id_regex: str,
+    deliverable: str = None,
 ):
 
     app_logger.info("Starting unsegmented onboarding job")
@@ -61,10 +69,26 @@ def unsegmented_onboarding_job(
     if language == "en":
         # do alignment first and then upload
         # aligned_wavs_dir, aligned_csv_path = align_wavs_whisper(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
-        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(
+            self,
+            wavs_path,
+            csv_path,
+            language,
+            start_id_regex,
+            end_id_regex,
+            assigned_only=True,
+        )
     else:
         # do alignment first and then upload
-        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(self, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(
+            self,
+            wavs_path,
+            csv_path,
+            language,
+            start_id_regex,
+            end_id_regex,
+            assigned_only=True,
+        )
 
     app_logger.debug(f"aligned_wavs_dir: {aligned_wavs_dir}")
 
@@ -77,7 +101,13 @@ def unsegmented_onboarding_job(
 
 
 def unsegmented_onboarding_job_sync(
-    dataset_id: int, language: str, wavs_path: str, csv_path: str, start_id_regex: str, end_id_regex: str, deliverable: str = None
+    dataset_id: int,
+    language: str,
+    wavs_path: str,
+    csv_path: str,
+    start_id_regex: str,
+    end_id_regex: str,
+    deliverable: str = None,
 ):
 
     app_logger.info("Starting unsegmented onboarding job")
@@ -90,10 +120,26 @@ def unsegmented_onboarding_job_sync(
     if language == "en":
         # do alignment first and then upload
         # aligned_wavs_dir, aligned_csv_path = align_wavs_whisper(None, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
-        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(None, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(
+            None,
+            wavs_path,
+            csv_path,
+            language,
+            start_id_regex,
+            end_id_regex,
+            assigned_only=True,
+        )
     else:
         # do alignment first and then upload
-        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(None, wavs_path, csv_path, language, start_id_regex, end_id_regex, assigned_only=True)
+        aligned_wavs_dir, aligned_csv_path = align_wavs_vad(
+            None,
+            wavs_path,
+            csv_path,
+            language,
+            start_id_regex,
+            end_id_regex,
+            assigned_only=True,
+        )
 
     # TODO: make sure that you keep the aligned csv
     shutil.rmtree(wavs_path, ignore_errors=True)

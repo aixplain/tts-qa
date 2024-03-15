@@ -1,7 +1,10 @@
 import os
 
-from src.paths import paths
 from dotenv import find_dotenv, load_dotenv
+
+from src.paths import paths
+
+
 load_dotenv(find_dotenv(paths.PROJECT_ROOT_DIR / "vars.env"), override=True)
 
 import sys
@@ -43,7 +46,11 @@ engine = create_engine(POSTGRES_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-s3 = boto3.client("s3", aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"), aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"))
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+)
 bucket_name = os.environ.get("S3_BUCKET_NAME")
 dataset_dir = os.environ.get("S3_DATASET_DIR")
 
@@ -55,6 +62,7 @@ lang_map = {
     "es": "spanish",
     "de": "german",
     "it": "italian",
+    "am": "amharic",
 }
 
 
